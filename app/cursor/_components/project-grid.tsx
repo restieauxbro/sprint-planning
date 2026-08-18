@@ -1,13 +1,12 @@
 "use client";
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Assignment, Engineer, Phase, Project, Sprint } from "@/lib/schema";
 import { cn } from "@/lib/utils";
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
-import type { CellSegment, PhaseTimeline } from "../_lib/schedule";
+import type { PhaseTimeline } from "../_lib/schedule";
 import { formatEffortDays } from "../_lib/schedule";
-import { phaseLabel, plannerLabels, projectCode, projectInk } from "./colors";
+import { plannerLabels, projectCode, projectInk } from "./colors";
 import type { Selection } from "./selection";
 
 export function ProjectGrid({
@@ -16,7 +15,6 @@ export function ProjectGrid({
   engineers,
   assignments,
   sprints,
-  segments,
   timelines,
   currentSprintId,
   highlightProjectId,
@@ -30,7 +28,6 @@ export function ProjectGrid({
   engineers: Engineer[];
   assignments: Assignment[];
   sprints: Sprint[];
-  segments: CellSegment[];
   timelines: PhaseTimeline[];
   currentSprintId: string | null;
   highlightProjectId: string | null;
@@ -115,8 +112,9 @@ export function ProjectGrid({
               </span>
               <span>
                 <span className="flex items-center gap-1.5 text-sm font-medium">
-                  <span className="size-2 rounded-sm" style={{ background: ink.fill }} />
-                  <span className="font-mono text-[11px]">{projectCode(project)}</span>
+                  <span className="inline-flex min-w-6 shrink-0 justify-center text-[13px] leading-none">
+                    {projectCode(project)}
+                  </span>
                   {project.name}
                 </span>
                 <span className="block font-mono text-[10px] text-stone-500">
@@ -143,7 +141,6 @@ export function ProjectGrid({
                   engineers={engineers}
                   assignments={assignments.filter((a) => a.phaseId === phase.id)}
                   sprints={sprints}
-                  segments={segments.filter((s) => s.phaseId === phase.id)}
                   timeline={timelines.find((t) => t.phaseId === phase.id)}
                   currentSprintId={currentSprintId}
                   highlightProjectId={highlightProjectId}
@@ -180,7 +177,6 @@ export function ProjectGrid({
                 engineers={engineers}
                 assignments={[]}
                 sprints={sprints}
-                segments={[]}
                 timeline={timelines.find((t) => t.phaseId === phase.id)}
                 currentSprintId={currentSprintId}
                 highlightProjectId={highlightProjectId}
@@ -203,7 +199,6 @@ function PhaseRow({
   engineers,
   assignments,
   sprints,
-  segments,
   timeline,
   currentSprintId,
   highlightProjectId,
@@ -217,7 +212,6 @@ function PhaseRow({
   engineers: Engineer[];
   assignments: Assignment[];
   sprints: Sprint[];
-  segments: CellSegment[];
   timeline?: PhaseTimeline;
   currentSprintId: string | null;
   highlightProjectId: string | null;
@@ -235,29 +229,33 @@ function PhaseRow({
   const dim = highlightProjectId != null && highlightProjectId !== project.id;
   const isSelected = selected?.kind === "phase" && selected.phaseId === phase.id;
   const labels = plannerLabels(engineers);
-  const people = assignments
-    .map((a) => {
-      const label = labels.get(a.engineerId) ?? a.engineerId;
-      return `${label} ${Math.round(a.fraction * 100)}%`;
-    })
-    .join(" · ");
+  const peopleByFraction = new Map<number, string[]>();
+  for (const assignment of assignments) {
+    const names = peopleByFraction.get(assignment.fraction) ?? [];
+    names.push(labels.get(assignment.engineerId) ?? assignment.engineerId);
+    peopleByFraction.set(assignment.fraction, names);
+  }
+  const people = [...peopleByFraction.entries()]
+    .map(([fraction, names]) => `${names.join(" & ")} ${Math.round(fraction * 100)}%`)
+    .join(", ");
 
   return (
-    <>
+    <div
+      className="col-span-full grid"
+      style={{ gridTemplateColumns: `220px repeat(${sprints.length}, minmax(112px, 1fr))` }}
+    >
       <button
         type="button"
         onClick={() => onSelect({ kind: "phase", phaseId: phase.id })}
         className="sticky left-0 z-10 border-b border-stone-300 bg-[#f4f0e6] px-3 py-2 text-left hover:bg-[#ebe4d4]"
       >
-        <p className="text-[13px] text-stone-800">{phaseLabel(project, phase)}</p>
+        <p className="text-[13px] text-stone-800">{phase.name}</p>
         <p className="font-mono text-[10px] text-stone-500">
           {formatEffortDays(phase.effortDays)}
           {unscheduled ? " · no one" : ""}
         </p>
       </button>
       {sprints.map((sprint, idx) => {
-        const inBar = startIdx >= 0 && idx >= startIdx && idx <= endIdx;
-        const first = idx === startIdx;
         return (
           <div
             key={sprint.id}
@@ -265,54 +263,41 @@ function PhaseRow({
               "relative h-12 border-b border-l border-stone-300",
               sprint.id === currentSprintId && "bg-[#e8d7a8]/20",
             )}
+            style={{ gridColumn: idx + 2, gridRow: 1 }}
           >
-            {inBar && (
-              <Tooltip>
-                <TooltipTrigger
-                  type="button"
-                  onClick={() => onSelect({ kind: "phase", phaseId: phase.id })}
-                  className={cn(
-                    "absolute inset-y-1.5 left-0 right-0 text-left text-[11px]",
-                    first ? "rounded-l-sm px-1.5" : "",
-                    idx === endIdx ? "rounded-r-sm" : "",
-                    isSelected && "ring-2 ring-stone-900",
-                    dim && "opacity-25",
-                  )}
-                  style={{ background: ink.fill, color: ink.ink }}
-                >
-                  {first ? (
-                    <span className="block truncate">
-                      {people || phaseLabel(project, phase)}
-                    </span>
-                  ) : null}
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>
-                    {project.name} · {phaseLabel(project, phase)}
-                  </p>
-                  <p>{people || "Unassigned"}</p>
-                  {segments
-                    .filter((s) => s.sprintId === sprint.id)
-                    .map((s) => (
-                      <p key={s.engineerId}>
-                        {s.days.toFixed(1)}d · {Math.round(s.allocatedFraction * 100)}%
-                      </p>
-                    ))}
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {unscheduled && idx === 0 && (
-              <button
-                type="button"
-                onClick={() => onSelect({ kind: "phase", phaseId: phase.id })}
-                className="absolute inset-y-1.5 left-1 right-1 truncate rounded-sm border border-dashed border-[#9a3412] px-1.5 text-left text-[11px] text-[#9a3412]"
-              >
-                Unscheduled · {formatEffortDays(phase.effortDays)}
-              </button>
-            )}
           </div>
         );
       })}
-    </>
+      {startIdx >= 0 && endIdx >= startIdx && (
+        <button
+          type="button"
+          onClick={() => onSelect({ kind: "phase", phaseId: phase.id })}
+          title={`${project.name} · ${phase.name}\n${people || "Unassigned"}`}
+          className={cn(
+            "z-10 mx-1 my-1.5 min-w-0 truncate rounded-sm px-1.5 text-left text-[11px]",
+            isSelected && "ring-2 ring-stone-900",
+            dim && "opacity-25",
+          )}
+          style={{
+            gridColumn: `${startIdx + 2} / ${endIdx + 3}`,
+            gridRow: 1,
+            background: ink.fill,
+            color: ink.ink,
+          }}
+        >
+          {people || phase.name}
+        </button>
+      )}
+      {unscheduled && (
+        <button
+          type="button"
+          onClick={() => onSelect({ kind: "phase", phaseId: phase.id })}
+          className="z-10 mx-1 my-1.5 truncate rounded-sm border border-dashed border-[#9a3412] px-1.5 text-left text-[11px] text-[#9a3412]"
+          style={{ gridColumn: "2 / 3", gridRow: 1 }}
+        >
+          Unscheduled · {formatEffortDays(phase.effortDays)}
+        </button>
+      )}
+    </div>
   );
 }

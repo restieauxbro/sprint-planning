@@ -22,6 +22,7 @@ export function TeamGrid({
   onSelect,
   onToggleEngineer,
   projectIndex,
+  showProjectName,
 }: {
   engineers: Engineer[];
   roster: Engineer[];
@@ -36,6 +37,7 @@ export function TeamGrid({
   onSelect: (selection: Selection) => void;
   onToggleEngineer: (id: string) => void;
   projectIndex: Map<string, number>;
+  showProjectName: boolean;
 }) {
   const labels = plannerLabels(roster);
 
@@ -43,7 +45,7 @@ export function TeamGrid({
     <div
       className="grid min-w-max"
       style={{
-        gridTemplateColumns: `repeat(${sprints.length + 1}, minmax(112px, 1fr))`,
+        gridTemplateColumns: `112px repeat(${sprints.length}, minmax(112px, 1fr))`,
       }}
     >
       <div className="sticky left-0 z-20 border-b border-stone-300 bg-[#efeae0]" />
@@ -88,6 +90,7 @@ export function TeamGrid({
           onSelect={onSelect}
           onToggleEngineer={onToggleEngineer}
           projectIndex={projectIndex}
+          showProjectName={showProjectName}
         />
       ))}
     </div>
@@ -108,6 +111,7 @@ function EngineerRow({
   onSelect,
   onToggleEngineer,
   projectIndex,
+  showProjectName,
 }: {
   engineer: Engineer;
   label: string;
@@ -122,6 +126,7 @@ function EngineerRow({
   onSelect: (selection: Selection) => void;
   onToggleEngineer: (id: string) => void;
   projectIndex: Map<string, number>;
+  showProjectName: boolean;
 }) {
   return (
     <>
@@ -151,6 +156,7 @@ function EngineerRow({
             selected={selected}
             onSelect={onSelect}
             projectIndex={projectIndex}
+            showProjectName={showProjectName}
           />
         );
       })}
@@ -170,6 +176,7 @@ function CapacityCell({
   selected,
   onSelect,
   projectIndex,
+  showProjectName,
 }: {
   sprint: Sprint;
   engineer: Engineer;
@@ -182,6 +189,7 @@ function CapacityCell({
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
   projectIndex: Map<string, number>;
+  showProjectName: boolean;
 }) {
   const working = sprint.workingDays;
   const ptoPct = ((load?.timeOffDays ?? 0) / working) * 100;
@@ -203,9 +211,9 @@ function CapacityCell({
           <div
             className="flex items-center justify-center border-r border-stone-400/40 bg-[repeating-linear-gradient(-45deg,transparent,transparent_3px,#c4b8a0_3px,#c4b8a0_4px)] text-[9px] text-stone-600"
             style={{ width: `${ptoPct}%` }}
-            title={`PTO ${load?.timeOffDays}d`}
+          title={`Leave ${load?.timeOffDays}d`}
           >
-            PTO
+            Leave
           </div>
         )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -223,6 +231,7 @@ function CapacityCell({
                   selected={selected}
                   onSelect={onSelect}
                   projectIndex={projectIndex}
+                  showProjectName={showProjectName}
                 />
               ))}
               {rowIdx === rows.length - 1 && (load?.idleDays ?? 0) > 0.05 && (
@@ -302,6 +311,7 @@ function SegmentButton({
   selected,
   onSelect,
   projectIndex,
+  showProjectName,
 }: {
   seg: CellSegment;
   workingDays: number;
@@ -312,6 +322,7 @@ function SegmentButton({
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
   projectIndex: Map<string, number>;
+  showProjectName: boolean;
 }) {
   const phase = phases.find((p) => p.id === seg.phaseId);
   const project = projects.find((p) => p.id === seg.projectId);
@@ -319,9 +330,7 @@ function SegmentButton({
   const dim = highlightProjectId != null && highlightProjectId !== seg.projectId;
   const isSelected = selected?.kind === "phase" && selected.phaseId === seg.phaseId;
   const widthFrac = barWidth(seg, workingDays);
-  const labelPct = Math.round(
-    (seg.unfilled ? seg.requestedFraction : widthFrac) * 100,
-  );
+  const labelPct = Math.round(seg.requestedFraction * 100);
 
   return (
     <Tooltip>
@@ -343,6 +352,7 @@ function SegmentButton({
         }}
       >
         <span className="block truncate font-medium">
+          {showProjectName && project ? `${project.name} · ` : ""}
           {project && phase ? phaseLabel(project, phase) : phase?.name}
         </span>
         <span className="block truncate text-[9px] opacity-80">

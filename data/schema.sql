@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS sprints (
 CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  code TEXT NOT NULL, -- short SKU, usually 3 letters (Chk, Pay, Atl)
+  code TEXT NOT NULL, -- short label on bars: letters, emoji, whatever (Chk, 🧠)
   priority INTEGER NOT NULL DEFAULT 1 CHECK (priority >= 1),
   sort_order INTEGER NOT NULL DEFAULT 0
 );

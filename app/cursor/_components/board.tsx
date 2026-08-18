@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { ScheduleIntent } from "@/lib/schema";
 import { cn } from "@/lib/utils";
-import { ChevronDownIcon, RefreshCwIcon } from "lucide-react";
+import { ChevronDownIcon, EyeIcon, RefreshCwIcon } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import type { ScheduleResult } from "../_lib/schedule";
 import { projectCode, projectInk } from "./colors";
@@ -34,6 +34,7 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
   const [projectFilter, setProjectFilter] = useState<string[]>([]);
   const [engineerFilter, setEngineerFilter] = useState<string[]>([]);
   const [highlightProjectId, setHighlightProjectId] = useState<string | null>(null);
+  const [showProjectName, setShowProjectName] = useState(false);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -169,6 +170,10 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
                 : undefined
             }
           />
+          <ViewMenu
+            showProjectName={showProjectName}
+            onShowProjectNameChange={setShowProjectName}
+          />
           <Button variant="outline" size="sm" onClick={copySnapshot}>
             Copy snapshot
           </Button>
@@ -244,6 +249,7 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
               onSelect={setSelected}
               onToggleEngineer={toggleEngineer}
               projectIndex={projectIndex}
+              showProjectName={showProjectName}
             />
           ) : (
             <ProjectGrid
@@ -252,7 +258,6 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
               engineers={intent.engineers}
               assignments={intent.assignments}
               sprints={visibleSprints}
-              segments={segments}
               timelines={result.phaseTimelines}
               currentSprintId={result.currentSprintId}
               highlightProjectId={highlightProjectId}
@@ -276,6 +281,36 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
         )}
       </div>
     </div>
+  );
+}
+
+function ViewMenu({
+  showProjectName,
+  onShowProjectNameChange,
+}: {
+  showProjectName: boolean;
+  onShowProjectNameChange: (show: boolean) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1")}>
+        <EyeIcon className="size-3.5" />
+        View
+        <ChevronDownIcon className="size-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-52">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Show on cards</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuCheckboxItem
+            checked={showProjectName}
+            onCheckedChange={onShowProjectNameChange}
+          >
+            Project name
+          </DropdownMenuCheckboxItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -415,7 +450,9 @@ function FilterItemLabel({
         <span className="size-2.5 shrink-0 rounded-sm" style={{ background: item.swatch }} />
       )}
       {item.code && (
-        <span className="w-8 font-mono text-[11px] text-muted-foreground">{item.code}</span>
+        <span className="inline-flex min-w-6 shrink-0 justify-center text-[13px] leading-none text-muted-foreground">
+          {item.code}
+        </span>
       )}
       {item.name}
     </span>

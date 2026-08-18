@@ -27,7 +27,7 @@ Schema: [`data/schema.sql`](data/schema.sql). Units: person-days; 1 week = 5 day
 | --- | --- |
 | `engineers` | People and FTE |
 | `sprints` | Named 2-week buckets with dates |
-| `projects` | Initiatives with a short SKU (`Chk`) and priority (1 wins) |
+| `projects` | Initiatives with a short `code` (`Chk`, or an emoji like `🧠`) and priority (1 wins) |
 | `phases` | Ordered work on a project (`effort_days`, optional `parallel_ok`) |
 | `assignments` | Who works a phase, at what fraction of capacity |
 | `time_off` | Days out in a given sprint |

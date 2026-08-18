@@ -13,6 +13,8 @@ export function projectInk(index: number) {
 export function projectCode(project: { code?: string | null; name: string }) {
   const code = project.code?.trim();
   if (code) return code;
+  const emoji = project.name.match(/\p{Extended_Pictographic}/u);
+  if (emoji?.[0]) return emoji[0];
   const letters = project.name.replace(/[^A-Za-z0-9]/g, "");
   return letters.slice(0, 3) || "PRJ";
 }

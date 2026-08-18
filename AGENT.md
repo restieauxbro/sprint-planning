@@ -17,7 +17,7 @@ Schema: [`data/schema.sql`](data/schema.sql). Reset seed: `npm run db:init`.
 | --- | --- |
 | `engineers` | People. `id` is a slug (`eng_maya`). `title` is shown on the Team page (Engineer, BA, …). |
 | `sprints` | Named 2-week buckets. Dates are `YYYY-MM-DD`. |
-| `projects` | Initiatives. `code` is a short SKU (`Chk`). Lower `priority` number claims capacity first. |
+| `projects` | Initiatives. `code` is a short label on bars (`Chk`, or an emoji like `🧠`). Lower `priority` number claims capacity first. |
 | `phases` | Ordered work on a project. `parallel_ok=1` can overlap the previous phase. |
 | `assignments` | Who works a phase, at what fraction. Not a cell per sprint. |
 | `time_off` | Days out in a given sprint. Shrinks that person’s capacity. |

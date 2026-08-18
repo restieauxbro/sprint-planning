@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clipboard,
+  Eye,
   Filter,
   Highlighter,
   RefreshCw,
@@ -77,7 +78,7 @@ function MultiFilter({
               onClick={(event) => event.preventDefault()}
             >
               {colors && <span className="size-2.5 shrink-0" style={{ background: colors.get(item.id)?.solid }} />}
-              {item.code && <span className="w-8 font-mono text-[11px]">{item.code}</span>}
+              {item.code && <span className="inline-flex min-w-6 shrink-0 justify-center text-[13px] leading-none">{item.code}</span>}
               <span>{item.name}</span>
             </DropdownMenuCheckboxItem>
           ))}
@@ -111,10 +112,38 @@ function HighlightMenu({
           {projects.map((project) => (
             <DropdownMenuRadioItem key={project.id} value={project.id}>
               <span className="size-2.5" style={{ background: colors.get(project.id)?.solid }} />
-              <span className="w-8 font-mono text-[11px]">{project.code}</span>{project.name}
+              <span className="inline-flex min-w-6 shrink-0 justify-center text-[13px] leading-none">{project.code}</span>{project.name}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ViewMenu({
+  showProjectName,
+  onShowProjectNameChange,
+}: {
+  showProjectName: boolean;
+  onShowProjectNameChange: (show: boolean) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+        <Eye />
+        View
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-52">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Show on cards</DropdownMenuLabel>
+          <DropdownMenuCheckboxItem
+            checked={showProjectName}
+            onCheckedChange={onShowProjectNameChange}
+          >
+            Project name
+          </DropdownMenuCheckboxItem>
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -127,6 +156,7 @@ function WorkBar({
   ink,
   dimmed,
   onSelect,
+  showProjectName,
 }: {
   segment: CellSegment;
   intent: ScheduleIntent;
@@ -134,6 +164,7 @@ function WorkBar({
   ink: { solid: string; pale: string; border: string };
   dimmed: boolean;
   onSelect: () => void;
+  showProjectName: boolean;
 }) {
   const phase = intent.phases.find((item) => item.id === segment.phaseId)!;
   const project = intent.projects.find((item) => item.id === segment.projectId)!;
@@ -141,7 +172,9 @@ function WorkBar({
   const width = segment.unfilled
     ? segment.requestedFraction * 100
     : (segment.days / sprintWorkingDays) * 100;
-  const label = `${project.code} ${phase.name}`;
+  const label = showProjectName
+    ? `${project.name} · ${project.code} ${phase.name}`
+    : `${project.code} ${phase.name}`;
   return (
     <button
       type="button"
@@ -160,7 +193,8 @@ function WorkBar({
     >
       <span className="block truncate text-[10px] font-semibold" style={{ color: ink.border }}>{label}</span>
       <span className="block truncate font-mono text-[9px] text-stone-600">
-        {initials(engineer.name)} {Math.round((segment.unfilled ? segment.requestedFraction : segment.days / sprintWorkingDays) * 100)}%{segment.unfilled ? " queued" : ""}
+        {initials(engineer.name)} {Math.round(segment.requestedFraction * 100)}%
+        {segment.unfilled ? " queued" : ""}
       </span>
     </button>
   );
@@ -176,6 +210,7 @@ function TeamGrid({
   onSelection,
   onPersonClick,
   colors,
+  showProjectName,
 }: {
   intent: ScheduleIntent;
   result: ScheduleResult;
@@ -186,6 +221,7 @@ function TeamGrid({
   onSelection: (selection: InspectorSelection) => void;
   onPersonClick: (id: string) => void;
   colors: Map<string, { solid: string; pale: string; border: string }>;
+  showProjectName: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const people = intent.engineers.filter((engineer) => !selectedPeople.length || selectedPeople.includes(engineer.id));
@@ -232,9 +268,9 @@ function TeamGrid({
                 <div key={sprint.id} className={`relative min-h-24 border-r border-stone-300 p-1.5 ${sprint.id === result.currentSprintId ? "bg-amber-50/60" : "bg-[#faf7ef]/60"}`}>
                   {load?.overloaded && <span className="absolute right-1 top-1 z-10 bg-red-800 px-1.5 py-0.5 font-mono text-[9px] text-white">{Math.round(load.requestedFractionSum * 100)}%</span>}
                   <div className="flex w-full flex-wrap content-start gap-y-1">
-                    {timeOff > 0 && <div className="min-h-10 border border-stone-500 bg-stone-200 px-1 py-1 font-mono text-[9px]" style={{ width: `${(timeOff / sprint.workingDays) * 100}%`, backgroundImage: hatch }} title={`${fmt(timeOff)} days PTO`}>PTO</div>}
+                    {timeOff > 0 && <div className="min-h-10 border border-stone-500 bg-stone-200 px-1 py-1 font-mono text-[9px]" style={{ width: `${(timeOff / sprint.workingDays) * 100}%`, backgroundImage: hatch }} title={`${fmt(timeOff)} days Leave`}>Leave</div>}
                     {[...delivered, ...unfilled].map((segment) => (
-                      <WorkBar key={`${segment.phaseId}:${segment.engineerId}:${segment.sprintId}`} segment={segment} intent={intent} sprintWorkingDays={sprint.workingDays} ink={colors.get(segment.projectId)!} dimmed={!!highlight && highlight !== segment.projectId} onSelect={() => onSelection({ type: "phase", phaseId: segment.phaseId })} />
+                      <WorkBar key={`${segment.phaseId}:${segment.engineerId}:${segment.sprintId}`} segment={segment} intent={intent} sprintWorkingDays={sprint.workingDays} ink={colors.get(segment.projectId)!} dimmed={!!highlight && highlight !== segment.projectId} onSelect={() => onSelection({ type: "phase", phaseId: segment.phaseId })} showProjectName={showProjectName} />
                     ))}
                     {(load?.idleDays ?? 0) > 0.001 && <button type="button" onClick={() => onSelection({ type: "idle", engineerId: engineer.id, sprintId: sprint.id })} className="min-h-10 border border-dashed border-stone-400 bg-transparent px-1 py-1 text-left font-mono text-[9px] text-stone-500 hover:bg-stone-100" style={{ width: `${(load!.idleDays / sprint.workingDays) * 100}%` }} title={`${fmt(load!.idleDays)} idle days`}>idle {fmt(load!.idleDays)}d</button>}
                     {unusedFte > 0.001 && <div className="min-h-7 border border-stone-300 bg-stone-300/70 px-1 py-1 font-mono text-[8px] text-stone-600" style={{ width: `${(unusedFte / sprint.workingDays) * 100}%` }} title={`${fmt(unusedFte)} days unavailable through FTE`}>unused FTE</div>}
@@ -259,6 +295,7 @@ function ProjectsGrid({
   setHighlight,
   onSelection,
   colors,
+  showProjectName,
 }: {
   intent: ScheduleIntent;
   result: ScheduleResult;
@@ -269,6 +306,7 @@ function ProjectsGrid({
   setHighlight: (id: string | null) => void;
   onSelection: (selection: InspectorSelection) => void;
   colors: Map<string, { solid: string; pale: string; border: string }>;
+  showProjectName: boolean;
 }) {
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -314,7 +352,7 @@ function ProjectsGrid({
                   <div key={phase.id} className="grid min-h-14 border-b border-stone-300" style={{ gridTemplateColumns: template }}>
                     <button type="button" onClick={() => onSelection({ type: "phase", phaseId: phase.id })} className="sticky left-0 z-10 border-r border-stone-300 bg-[#f4f0e6] px-4 py-3 text-left"><strong className="block truncate text-xs">{project.code} {phase.name}</strong><span className="font-mono text-[9px] text-stone-500">{formatEffortDays(phase.effortDays)}</span></button>
                     {sprints.map((sprint) => <div key={sprint.id} className={`border-r border-stone-300 ${sprint.id === result.currentSprintId ? "bg-amber-50/60" : "bg-[#faf7ef]/60"}`} />)}
-                    {intersects && <button type="button" onClick={() => onSelection({ type: "phase", phaseId: phase.id })} className="z-[1] my-2 min-w-0 overflow-hidden border px-2 py-1 text-left" style={{ gridColumn: `${start + 2} / ${endPosition + 3}`, gridRow: 1, background: ink.solid, borderColor: ink.border, color: "#fff" }} title={`${project.code} ${phase.name}: ${assignees}`}><span className="block truncate text-[10px] font-semibold">{project.code} {phase.name}</span><span className="block truncate font-mono text-[9px] opacity-80">{assignees}</span></button>}
+                    {intersects && <button type="button" onClick={() => onSelection({ type: "phase", phaseId: phase.id })} className="z-[1] my-2 min-w-0 overflow-hidden border px-2 py-1 text-left" style={{ gridColumn: `${start + 2} / ${endPosition + 3}`, gridRow: 1, background: ink.solid, borderColor: ink.border, color: "#fff" }} title={`${project.code} ${phase.name}: ${assignees}`}><span className="block truncate text-[10px] font-semibold">{showProjectName ? `${project.name} · ` : ""}{project.code} {phase.name}</span><span className="block truncate font-mono text-[9px] opacity-80">{assignees}</span></button>}
                   </div>
                 );
               })}
@@ -326,7 +364,7 @@ function ProjectsGrid({
           {unscheduled.map((timeline) => {
             const phase = intent.phases.find((item) => item.id === timeline.phaseId)!;
             const project = intent.projects.find((item) => item.id === phase.projectId)!;
-            return <div key={phase.id} className="grid min-h-14 border-b border-amber-200" style={{ gridTemplateColumns: template }}><button type="button" onClick={() => onSelection({ type: "phase", phaseId: phase.id })} className="sticky left-0 z-10 border-r border-amber-200 bg-amber-50 px-4 py-3 text-left"><strong className="block text-xs">{project.code} {phase.name}</strong><span className="font-mono text-[9px] text-amber-800">{formatEffortDays(phase.effortDays)}</span></button>{sprints.map((sprint, index) => <div key={sprint.id} className="border-r border-amber-200 p-2">{index === 0 && <button type="button" onClick={() => onSelection({ type: "phase", phaseId: phase.id })} className="w-full border border-dashed border-amber-700 px-2 py-2 text-left font-mono text-[9px] text-amber-900">Unscheduled · {formatEffortDays(phase.effortDays)}</button>}</div>)}</div>;
+            return <div key={phase.id} className="grid min-h-14 border-b border-amber-200" style={{ gridTemplateColumns: template }}><button type="button" onClick={() => onSelection({ type: "phase", phaseId: phase.id })} className="sticky left-0 z-10 border-r border-amber-200 bg-amber-50 px-4 py-3 text-left"><strong className="block text-xs">{project.code} {phase.name}</strong><span className="font-mono text-[9px] text-amber-800">{formatEffortDays(phase.effortDays)}</span></button>{sprints.map((sprint, index) => <div key={sprint.id} className="border-r border-amber-200 p-2">{index === 0 && <button type="button" onClick={() => onSelection({ type: "phase", phaseId: phase.id })} className="w-full border border-dashed border-amber-700 px-2 py-2 text-left font-mono text-[9px] text-amber-900">{showProjectName ? `${project.name} · ` : ""}Unscheduled · {formatEffortDays(phase.effortDays)}</button>}</div>)}</div>;
           })}
         </section>}
       </div>
@@ -349,6 +387,7 @@ export function CodexBoard({
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [highlight, setHighlight] = useState<string | null>(null);
+  const [showProjectName, setShowProjectName] = useState(false);
   const [selection, setSelection] = useState<InspectorSelection>(null);
   const [live, setLive] = useState<"connecting" | "live" | "offline">("connecting");
   const [updated, setUpdated] = useState(false);
@@ -413,6 +452,7 @@ export function CodexBoard({
               <MultiFilter kind="Projects" items={intent.projects} selected={selectedProjects} onChange={setSelectedProjects} colors={colors} />
               <MultiFilter kind="People" items={intent.engineers} selected={selectedPeople} onChange={setSelectedPeople} />
               <HighlightMenu projects={intent.projects} value={highlight} onChange={setHighlight} colors={colors} />
+              <ViewMenu showProjectName={showProjectName} onShowProjectNameChange={setShowProjectName} />
               <Button variant="outline" size="sm" onClick={async () => { await navigator.clipboard.writeText(snapshot); setCopied(true); window.setTimeout(() => setCopied(false), 1400); }}>{copied ? <Check /> : <Clipboard />}{copied ? "Copied" : "Copy snapshot"}</Button>
               <Button variant="outline" size="sm" onClick={refresh}><RefreshCw />Refresh</Button>
             </div>
@@ -422,7 +462,7 @@ export function CodexBoard({
 
           <section className="py-5">
             <div className="mb-3 flex items-center justify-between px-5 lg:px-8"><p className="font-mono text-[10px] tracking-[0.16em] text-stone-500 uppercase">{lens === "team" ? "Capacity by person" : "Delivery by initiative"} · {visibleSprints.length} sprint horizon</p><p className="hidden font-mono text-[9px] text-stone-400 sm:block">← → scroll · esc closes inspector</p></div>
-            {lens === "team" ? <TeamGrid intent={intent} result={result} sprints={visibleSprints} selectedPeople={selectedPeople} selectedProjects={selectedProjects} highlight={highlight} onSelection={setSelection} onPersonClick={(id) => setSelectedPeople((current) => current.length === 1 && current[0] === id ? [] : [id])} colors={colors} /> : <ProjectsGrid intent={intent} result={result} sprints={visibleSprints} selectedProjects={selectedProjects} selectedPeople={selectedPeople} highlight={highlight} setHighlight={setHighlight} onSelection={setSelection} colors={colors} />}
+            {lens === "team" ? <TeamGrid intent={intent} result={result} sprints={visibleSprints} selectedPeople={selectedPeople} selectedProjects={selectedProjects} highlight={highlight} onSelection={setSelection} onPersonClick={(id) => setSelectedPeople((current) => current.length === 1 && current[0] === id ? [] : [id])} colors={colors} showProjectName={showProjectName} /> : <ProjectsGrid intent={intent} result={result} sprints={visibleSprints} selectedProjects={selectedProjects} selectedPeople={selectedPeople} highlight={highlight} setHighlight={setHighlight} onSelection={setSelection} colors={colors} showProjectName={showProjectName} />}
           </section>
         </div>
         {selection && <Inspector selection={selection} onClose={() => setSelection(null)} intent={intent} result={result} projectColors={colors} />}
