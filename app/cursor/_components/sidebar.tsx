@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { CalendarRangeIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon } from "lucide-react";
+import { CalendarRangeIcon, ChevronLeftIcon, ChevronRightIcon, FolderKanbanIcon, UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -10,6 +10,7 @@ const STORAGE_KEY = "sprint-planner.sidebar-collapsed";
 
 const NAV = [
   { href: "/cursor", label: "Planning", icon: CalendarRangeIcon, exact: true },
+  { href: "/cursor/projects", label: "Projects", icon: FolderKanbanIcon, exact: false },
   { href: "/cursor/team", label: "Team", icon: UsersIcon, exact: false },
 ] as const;
 

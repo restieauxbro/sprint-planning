@@ -34,7 +34,7 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
   const [projectFilter, setProjectFilter] = useState<string[]>([]);
   const [engineerFilter, setEngineerFilter] = useState<string[]>([]);
   const [highlightProjectId, setHighlightProjectId] = useState<string | null>(null);
-  const [showProjectName, setShowProjectName] = useState(false);
+  const [showProjectName, setShowProjectName] = useState(true);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -131,7 +131,7 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
               id: p.id,
               name: p.name,
               code: projectCode(p),
-              swatch: projectInk(projectIndex.get(p.id) ?? 0).fill,
+              swatch: projectInk(p.color ?? projectIndex.get(p.id) ?? 0).fill,
             }))}
             selected={projectFilter}
             onChange={setProjectFilter}
@@ -158,7 +158,7 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
                 id: p.id,
                 name: p.name,
                 code: projectCode(p),
-                swatch: projectInk(projectIndex.get(p.id) ?? 0).fill,
+                swatch: projectInk(p.color ?? projectIndex.get(p.id) ?? 0).fill,
               })),
             ]}
             selected={highlightProjectId ? [highlightProjectId] : [""]}
@@ -166,7 +166,7 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
             single
             swatch={
               highlightProjectId
-                ? projectInk(projectIndex.get(highlightProjectId) ?? 0).fill
+                ? projectInk(intent.projects.find((project) => project.id === highlightProjectId)?.color ?? projectIndex.get(highlightProjectId) ?? 0).fill
                 : undefined
             }
           />

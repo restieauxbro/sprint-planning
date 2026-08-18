@@ -82,7 +82,7 @@ export function Inspector({
   const project = intent.projects.find((p) => p.id === phase?.projectId);
   const timeline = timelines.find((t) => t.phaseId === phaseId);
   const assigned = intent.assignments.filter((a) => a.phaseId === phaseId);
-  const ink = projectInk(projectIndex.get(project?.id ?? "") ?? 0);
+  const ink = projectInk(project?.color ?? projectIndex.get(project?.id ?? "") ?? 0);
   const start = sprints.find((s) => s.id === timeline?.startSprintId);
   const end = sprints.find((s) => s.id === timeline?.endSprintId);
   const duration =

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "plan:impact": "tsx scripts/plan-impact.ts",
     "db:init": "node scripts/init-db.mjs"
   },
   "dependencies": {

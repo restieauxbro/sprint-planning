@@ -11,6 +11,7 @@ import {
   sprints,
   timeOff,
   type Engineer,
+  type Project,
   type ScheduleIntent,
 } from "./schema";
 
@@ -219,5 +220,86 @@ export function renameEngineer(id: string, name: string): AddEngineerResult {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message };
+  }
+}
+
+export type ProjectInput = {
+  name: string;
+  code: string;
+  color: string;
+  priority: number;
+};
+
+export type ProjectResult =
+  | { ok: true; project: Project }
+  | { ok: false; error: string };
+
+function slugifyProjectId(name: string, taken: Set<string>) {
+  const base =
+    "proj_" +
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "");
+  const fallback = "proj_project";
+  let id = base || fallback;
+  let n = 2;
+  while (taken.has(id)) {
+    id = `${base || fallback}_${n}`;
+    n += 1;
+  }
+  return id;
+}
+
+function validateProject(input: ProjectInput): { ok: true; value: ProjectInput } | { ok: false; error: string } {
+  const name = input.name.trim();
+  const code = input.code.trim();
+  const color = input.color.trim();
+  const priority = input.priority;
+  if (!name) return { ok: false, error: "Project name is required." };
+  if (!code) return { ok: false, error: "Project code is required." };
+  if (!color) return { ok: false, error: "Project colour is required." };
+  if (!Number.isInteger(priority) || priority < 1) {
+    return { ok: false, error: "Priority must be a whole number of 1 or higher." };
+  }
+  return { ok: true, value: { name, code, color, priority } };
+}
+
+export function addProject(input: ProjectInput): ProjectResult {
+  const validated = validateProject(input);
+  if (!validated.ok) return validated;
+  if (!dbFileExists()) return { ok: false, error: "Database missing. Run npm run db:init." };
+
+  try {
+    const db = getDb();
+    const existing = db.select().from(projects).all();
+    const id = slugifyProjectId(validated.value.name, new Set(existing.map((row) => row.id)));
+    const sortOrder = (db.select({ value: max(projects.sortOrder) }).from(projects).get()?.value ?? 0) + 1;
+    db.insert(projects).values({ id, ...validated.value, sortOrder }).run();
+    const project = db.select().from(projects).where(eq(projects.id, id)).get();
+    if (!project) return { ok: false, error: "Could not read the new project back." };
+    return { ok: true, project };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export function updateProject(id: string, input: ProjectInput): ProjectResult {
+  const validated = validateProject(input);
+  if (!validated.ok) return validated;
+  if (!id) return { ok: false, error: "Missing project." };
+  if (!dbFileExists()) return { ok: false, error: "Database missing. Run npm run db:init." };
+
+  try {
+    const db = getDb();
+    const existing = db.select().from(projects).where(eq(projects.id, id)).get();
+    if (!existing) return { ok: false, error: "That project no longer exists." };
+    db.update(projects).set(validated.value).where(eq(projects.id, id)).run();
+    const project = db.select().from(projects).where(eq(projects.id, id)).get();
+    if (!project) return { ok: false, error: "Could not read the project back." };
+    return { ok: true, project };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

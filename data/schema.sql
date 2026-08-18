@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   code TEXT NOT NULL, -- short label on bars: letters, emoji, whatever (Chk, 🧠)
+  color TEXT NOT NULL DEFAULT 'teal', -- palette id used on planner cards
   priority INTEGER NOT NULL DEFAULT 1 CHECK (priority >= 1),
   sort_order INTEGER NOT NULL DEFAULT 0
 );

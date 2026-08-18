@@ -48,15 +48,15 @@ export function TeamGrid({
         gridTemplateColumns: `112px repeat(${sprints.length}, minmax(112px, 1fr))`,
       }}
     >
-      <div className="sticky left-0 z-20 border-b border-stone-300 bg-[#efeae0]" />
+      <div className="sticky top-0 left-0 z-30 border-b border-stone-300 bg-[#efeae0]" />
       {sprints.map((sprint) => {
         const current = sprint.id === currentSprintId;
         return (
           <div
             key={sprint.id}
             className={cn(
-              "border-b border-l border-stone-300 px-2 py-2",
-              current && "bg-[#e8d7a8]/50",
+              "sticky top-0 z-20 border-b border-l border-stone-300 bg-[#efeae0] px-2 py-2",
+              current && "bg-stone-100",
             )}
           >
             <p className="font-mono text-[11px] tracking-wide text-stone-600">
@@ -195,7 +195,10 @@ function CapacityCell({
   const ptoPct = ((load?.timeOffDays ?? 0) / working) * 100;
   const unavailablePct =
     ((working - (load?.timeOffDays ?? 0) - (load?.capacityDays ?? 0)) / working) * 100;
-  const rows = packRequestedRows(segments, working);
+  // Queued work has no physical place in a fully unavailable sprint. Rendering it
+  // beside 100% leave forces the flex layout to squeeze it into misleading slivers.
+  const visibleSegments = (load?.capacityDays ?? 0) > 0 ? segments : [];
+  const rows = packRequestedRows(visibleSegments, working);
   const stacked = rows.length > 1;
 
   return (
@@ -326,7 +329,7 @@ function SegmentButton({
 }) {
   const phase = phases.find((p) => p.id === seg.phaseId);
   const project = projects.find((p) => p.id === seg.projectId);
-  const ink = projectInk(projectIndex.get(seg.projectId) ?? 0);
+  const ink = projectInk(project?.color ?? projectIndex.get(seg.projectId) ?? 0);
   const dim = highlightProjectId != null && highlightProjectId !== seg.projectId;
   const isSelected = selected?.kind === "phase" && selected.phaseId === seg.phaseId;
   const widthFrac = barWidth(seg, workingDays);
@@ -382,6 +385,7 @@ function SegmentButton({
 }
 
 function formatShortDate(iso: string) {
-  const [, m, d] = iso.split("-");
-  return `${m}/${d}`;
+  const [, , d] = iso.split("-");
+  const monthName = new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-AU", { month: "short", timeZone: "UTC" });
+  return `${d} ${monthName}`;
 }

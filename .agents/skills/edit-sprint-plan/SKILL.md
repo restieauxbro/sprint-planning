@@ -13,8 +13,9 @@ Do **not** insert Gantt cells. The scheduler fills sprints from today forward.
 
 1. **Look up ids** in SQLite (or copy slugs from the inspector: `eng_maya`, `phase_checkout_be`, `proj_checkout`, `2026-S17`).
 2. **Write** `INSERT` / `UPDATE` / `DELETE` against the live DB. Enable foreign keys.
-3. **Verify** with a `SELECT`. Do not run `npm run db:init` unless the user wants a full seed reset (destructive).
-4. If they want the change to survive `db:init`, also update [`data/seed.sql`](../../../data/seed.sql). Default is live DB only.
+3. **Check schedule impact** with `npm run plan:impact`. Review every new or changed overage with the user; adjust assignments or explicitly flag the impact before handoff.
+4. **Verify** the written rows with a `SELECT`. Do not run `npm run db:init` unless the user wants a full seed reset (destructive).
+5. If they want the change to survive `db:init`, also update [`data/seed.sql`](../../../data/seed.sql). Default is live DB only.
 
 ```bash
 DB="${PLANNER_DB:-data/planner.sqlite}"
@@ -30,6 +31,14 @@ PRAGMA foreign_keys = ON;
 -- statements
 SQL
 ```
+
+Inspect the computed timeline after every plan write:
+
+```bash
+npm run plan:impact
+```
+
+It reports the engineer, sprint, requested versus allocated capacity, and each active request contributing to an overage. This uses the same scheduler as the board; a SQL `SELECT` alone cannot reveal timeline conflicts.
 
 Schema: [`data/schema.sql`](../../../data/schema.sql). Extra worked examples: [`AGENT.md`](../../../AGENT.md).
 

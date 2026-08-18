@@ -33,10 +33,10 @@ INSERT INTO sprints (id, name, start_date, end_date, working_days) VALUES
 -- Julian joins backend at 50% so that phase finishes in 2 sprints instead of 3.
 -- Owen takes frontend after backend completes.
 -- Nina Cole (BA) is on the roster with no phase assignments yet.
-INSERT INTO projects (id, name, code, priority, sort_order) VALUES
-  ('proj_checkout', 'Checkout', 'Chk', 1, 1),
-  ('proj_payments', 'Payments', 'Pay', 2, 2),
-  ('proj_atlas', 'Atlas mobile', 'Atl', 3, 3);
+INSERT INTO projects (id, name, code, color, priority, sort_order) VALUES
+  ('proj_checkout', 'Checkout', 'Chk', 'teal', 1, 1),
+  ('proj_payments', 'Payments', 'Pay', 'brass', 2, 2),
+  ('proj_atlas', 'Atlas mobile', 'Atl', 'olive', 3, 3);
 
 INSERT INTO phases (id, project_id, name, kind, sort_order, effort_days, parallel_ok) VALUES
   ('phase_checkout_disc', 'proj_checkout', 'Discovery', 'discovery', 1, 5, 0),

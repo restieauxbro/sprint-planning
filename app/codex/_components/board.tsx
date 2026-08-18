@@ -39,8 +39,9 @@ const hatch = "repeating-linear-gradient(135deg, transparent 0 5px, rgba(68,58,4
 const fmt = (value: number) => Number(value.toFixed(1)).toString();
 const initials = (name: string) => name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 const shortDate = (value: string) => {
-  const [, month, day] = value.split("-");
-  return `${month}/${day}`;
+  const [, , day] = value.split("-");
+  const monthName = new Date(`${value}T00:00:00Z`).toLocaleDateString("en-AU", { month: "short", timeZone: "UTC" });
+  return `${day} ${monthName}`;
 };
 
 function MultiFilter({
@@ -243,7 +244,7 @@ function TeamGrid({
         <div className="sticky top-0 z-20 grid border-y border-stone-300 bg-[#eee8dc]" style={{ gridTemplateColumns: template }}>
           <div className="sticky left-0 z-30 border-r border-stone-300 bg-[#eee8dc] px-4 py-3 font-mono text-[10px] tracking-[0.15em] text-stone-500 uppercase">People · FTE</div>
           {sprints.map((sprint) => (
-            <div key={sprint.id} className={`border-r border-stone-300 px-3 py-2 ${sprint.id === result.currentSprintId ? "bg-amber-100/70" : ""}`}>
+            <div key={sprint.id} className={`border-r border-stone-300 px-3 py-2 ${sprint.id === result.currentSprintId ? "bg-stone-100" : ""}`}>
               <div className="flex items-center gap-2"><strong className="font-mono text-xs">{sprint.name}</strong>{sprint.id === result.currentSprintId && <Badge className="h-4 px-1 text-[8px]">now</Badge>}</div>
               <span className="font-mono text-[9px] text-stone-500">{shortDate(sprint.startDate)} – {shortDate(sprint.endDate)}</span>
             </div>
@@ -326,7 +327,7 @@ function ProjectsGrid({
       <div style={{ minWidth: 168 + sprints.length * 112 }}>
         <div className="sticky top-0 z-20 grid border-y border-stone-300 bg-[#eee8dc]" style={{ gridTemplateColumns: template }}>
           <div className="sticky left-0 z-30 border-r border-stone-300 bg-[#eee8dc] px-4 py-3 font-mono text-[10px] tracking-[0.15em] text-stone-500 uppercase">Projects</div>
-          {sprints.map((sprint) => <div key={sprint.id} className={`border-r border-stone-300 px-3 py-2 ${sprint.id === result.currentSprintId ? "bg-amber-100/70" : ""}`}><div className="flex items-center gap-2"><strong className="font-mono text-xs">{sprint.name}</strong>{sprint.id === result.currentSprintId && <Badge className="h-4 px-1 text-[8px]">now</Badge>}</div><span className="font-mono text-[9px] text-stone-500">{shortDate(sprint.startDate)} – {shortDate(sprint.endDate)}</span></div>)}
+          {sprints.map((sprint) => <div key={sprint.id} className={`border-r border-stone-300 px-3 py-2 ${sprint.id === result.currentSprintId ? "bg-stone-100" : ""}`}><div className="flex items-center gap-2"><strong className="font-mono text-xs">{sprint.name}</strong>{sprint.id === result.currentSprintId && <Badge className="h-4 px-1 text-[8px]">now</Badge>}</div><span className="font-mono text-[9px] text-stone-500">{shortDate(sprint.startDate)} – {shortDate(sprint.endDate)}</span></div>)}
         </div>
         {projects.map((project) => {
           const timelines = result.phaseTimelines.filter((timeline) => timeline.projectId === project.id && !timeline.unscheduled && assignmentVisible(timeline.phaseId));
@@ -387,14 +388,14 @@ export function CodexBoard({
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [highlight, setHighlight] = useState<string | null>(null);
-  const [showProjectName, setShowProjectName] = useState(false);
+  const [showProjectName, setShowProjectName] = useState(true);
   const [selection, setSelection] = useState<InspectorSelection>(null);
   const [live, setLive] = useState<"connecting" | "live" | "offline">("connecting");
   const [updated, setUpdated] = useState(false);
   const [clock, setClock] = useState(() => new Date(initialClock));
   const [copied, setCopied] = useState(false);
   const flashTimer = useRef<number | null>(null);
-  const colors = useMemo(() => new Map(intent.projects.map((project, index) => [project.id, projectInk(index)])), [intent.projects]);
+  const colors = useMemo(() => new Map(intent.projects.map((project, index) => [project.id, projectInk(project.color ?? index)])), [intent.projects]);
   const sortedSprints = useMemo(() => [...intent.sprints].sort((a, b) => a.startDate.localeCompare(b.startDate)), [intent.sprints]);
   const planning = sortedSprints.slice(result.planningStartIndex);
   const visibleSprints = horizon === "all" ? planning : planning.slice(0, horizon);

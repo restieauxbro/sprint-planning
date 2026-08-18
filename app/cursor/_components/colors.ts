@@ -1,13 +1,9 @@
-export const PROJECT_INKS = [
-  { fill: "oklch(0.78 0.06 230)", ink: "oklch(0.28 0.04 230)", label: "teal" },
-  { fill: "oklch(0.82 0.08 70)", ink: "oklch(0.32 0.06 70)", label: "brass" },
-  { fill: "oklch(0.80 0.06 150)", ink: "oklch(0.30 0.05 150)", label: "olive" },
-  { fill: "oklch(0.80 0.07 25)", ink: "oklch(0.33 0.06 25)", label: "rust" },
-  { fill: "oklch(0.82 0.05 300)", ink: "oklch(0.30 0.05 300)", label: "plum" },
-] as const;
+import { PROJECT_COLORS, projectColor } from "@/lib/project-colors";
 
-export function projectInk(index: number) {
-  return PROJECT_INKS[index % PROJECT_INKS.length]!;
+export { PROJECT_COLORS };
+
+export function projectInk(color?: string | number | null) {
+  return projectColor(color);
 }
 
 export function projectCode(project: { code?: string | null; name: string }) {
