@@ -1,0 +1,81 @@
+import { integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+
+export const engineers = sqliteTable("engineers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  title: text("title").notNull().default("Engineer"),
+  fte: real("fte").notNull().default(1),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const sprints = sqliteTable("sprints", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  workingDays: real("working_days").notNull().default(10),
+});
+
+export const projects = sqliteTable("projects", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+  priority: integer("priority").notNull().default(1),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const phases = sqliteTable("phases", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  kind: text("kind"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  effortDays: real("effort_days").notNull(),
+  parallelOk: integer("parallel_ok").notNull().default(0),
+});
+
+export const assignments = sqliteTable(
+  "assignments",
+  {
+    phaseId: text("phase_id")
+      .notNull()
+      .references(() => phases.id, { onDelete: "cascade" }),
+    engineerId: text("engineer_id")
+      .notNull()
+      .references(() => engineers.id, { onDelete: "cascade" }),
+    fraction: real("fraction").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.phaseId, table.engineerId] })],
+);
+
+export const timeOff = sqliteTable(
+  "time_off",
+  {
+    engineerId: text("engineer_id")
+      .notNull()
+      .references(() => engineers.id, { onDelete: "cascade" }),
+    sprintId: text("sprint_id")
+      .notNull()
+      .references(() => sprints.id, { onDelete: "cascade" }),
+    daysOff: real("days_off").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.engineerId, table.sprintId] })],
+);
+
+export type Engineer = typeof engineers.$inferSelect;
+export type Sprint = typeof sprints.$inferSelect;
+export type Project = typeof projects.$inferSelect;
+export type Phase = typeof phases.$inferSelect;
+export type Assignment = typeof assignments.$inferSelect;
+export type TimeOff = typeof timeOff.$inferSelect;
+
+export type ScheduleIntent = {
+  engineers: Engineer[];
+  sprints: Sprint[];
+  projects: Project[];
+  phases: Phase[];
+  assignments: Assignment[];
+  timeOff: TimeOff[];
+};

@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local sqlite (rebuild with npm run db:init)
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# editor / agent plans
+.cursor/

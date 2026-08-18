@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sprint planner
 
-## Getting Started
+A local sprint board for engineering and project managers. Keep the plan in SQLite, then use your own coding agent (Codex, Claude, Cursor, or similar) to adjust it: move someone onto a project, add time off, split a phase, change priority. The board recomputes who is busy and when work ends.
 
-First, run the development server:
+The app is a view, not a Gantt editor. You or the agent change rows in `data/planner.sqlite`; the timeline lays out from today forward and reloads when the file changes.
+
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run db:init   # recreate data/planner.sqlite from schema + seed
+npm run dev       # http://localhost:3000
+npm test          # scheduler tests
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- `/` — chooser
+- `/cursor` — working board (Team + Projects lenses)
+- `/codex` — placeholder for a second implementation against the same DB
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Needs Node and a machine that can compile `better-sqlite3` (normal on macOS/Linux). Override the database path with `PLANNER_DB` if you want.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## What lives in SQLite
 
-## Learn More
+Schema: [`data/schema.sql`](data/schema.sql). Units: person-days; 1 week = 5 days; a default sprint is 10 working days.
 
-To learn more about Next.js, take a look at the following resources:
+| Table | Intent |
+| --- | --- |
+| `engineers` | People and FTE |
+| `sprints` | Named 2-week buckets with dates |
+| `projects` | Initiatives with a short SKU (`Chk`) and priority (1 wins) |
+| `phases` | Ordered work on a project (`effort_days`, optional `parallel_ok`) |
+| `assignments` | Who works a phase, at what fraction of capacity |
+| `time_off` | Days out in a given sprint |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Do not insert Gantt cells. The scheduler fills those.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The seed (`data/seed.sql`) is a five-person plan starting at sprint **S17** (18 Aug 2026): Checkout, Payments, Atlas mobile. It includes split staffing, PTO, slack, an unscheduled frontend, and a BA without assignments.
 
-## Deploy on Vercel
+## Change the plan
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Copy slugs from the inspector (`eng_maya`, `phase_checkout_be`, …), then `INSERT` / `UPDATE` / `DELETE` in the sqlite file. The board watches `data/` over SSE (`/api/watch`) and flashes **Plan updated**.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Reset to seed: `npm run db:init`.
+
+Worked SQL examples: [`AGENT.md`](AGENT.md).
+
+## How the schedule is computed
+
+From the current sprint onward, eligible phases claim capacity in project-priority order. Sequential phases start the sprint after the predecessor finishes. Leftover days in a sprint pour into the next eligible assignment instead of sitting idle. Overload is effective demand over 1.0, not raw fraction sums.
+
+The scheduler lives next to the board (`app/cursor/_lib/schedule.ts`), not in shared `lib/`. Shared pieces are the DB (`lib/db.ts`), schema, watch API, and UI kit.
+
+## Stack
+
+Next.js 16 (App Router), React 19, SQLite via better-sqlite3 + Drizzle, Tailwind + shadcn, Vitest.
