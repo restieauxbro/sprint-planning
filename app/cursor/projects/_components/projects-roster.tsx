@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PROJECT_COLORS, projectColor } from "@/lib/project-colors";
 import type { Project } from "@/lib/schema";
 import { cn } from "@/lib/utils";
@@ -178,25 +179,50 @@ function TagChips({ value }: { value: string }) {
 }
 
 function ColourPicker({ value, onChange, disabled }: { value: string; onChange: (color: string) => void; disabled: boolean }) {
+  const selected = projectColor(value);
+
   return (
-    <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Project colour">
-      {PROJECT_COLORS.map((color) => {
-        const selected = color.id === value;
-        return (
-          <button
-            key={color.id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={color.label}
-            title={color.label}
-            disabled={disabled}
-            onClick={() => onChange(color.id)}
-            className={cn("size-9 rounded-md border-2 transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50", selected ? "scale-105 border-stone-900 ring-2 ring-stone-300" : "border-white/70")}
-            style={{ background: projectColor(color.id).solid }}
+    <Popover>
+      <PopoverTrigger
+        disabled={disabled}
+        className="mt-2 inline-flex h-8 items-center gap-2 rounded-md border border-stone-300 bg-[#f4f0e6] px-2 text-sm hover:border-stone-500 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="size-4 rounded-sm border border-black/15" style={{ background: selected.solid }} />
+        <span>{selected.label}</span>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 border border-stone-300 bg-[#faf7ef] p-3">
+        <div>
+          <p className="font-mono text-[10px] tracking-wide text-stone-500 uppercase">Quick colours</p>
+          <div className="mt-2 grid grid-cols-6 gap-2" role="radiogroup" aria-label="Project colour presets">
+            {PROJECT_COLORS.map((color) => {
+              const isSelected = color.id === value;
+              return (
+                <button
+                  key={color.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  aria-label={color.label}
+                  title={color.label}
+                  onClick={() => onChange(color.id)}
+                  className={cn("size-9 rounded-md border-2 transition-transform hover:scale-105", isSelected ? "scale-105 border-stone-900 ring-2 ring-stone-300" : "border-white/70")}
+                  style={{ background: color.solid }}
+                />
+              );
+            })}
+          </div>
+        </div>
+        <label className="mt-3 flex items-center justify-between border-t border-stone-300 pt-3">
+          <span className="font-mono text-[10px] tracking-wide text-stone-500 uppercase">Any colour</span>
+          <input
+            aria-label="Custom project colour"
+            type="color"
+            value={selected.solid}
+            onChange={(event) => onChange(event.target.value)}
+            className="size-9 cursor-pointer rounded-md border border-stone-300 bg-transparent p-0.5"
           />
-        );
-      })}
-    </div>
+        </label>
+      </PopoverContent>
+    </Popover>
   );
 }

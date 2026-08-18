@@ -66,6 +66,19 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
   const phases = intent.phases.filter(
     (p) => projectFilter.length === 0 || projectFilter.includes(p.projectId),
   );
+  const projectViewProjects = projects.filter((project) => {
+    if (!engineerFilter.length) return true;
+    const projectPhaseIds = new Set(
+      phases.filter((phase) => phase.projectId === project.id).map((phase) => phase.id),
+    );
+    return intent.assignments.some(
+      (assignment) =>
+        projectPhaseIds.has(assignment.phaseId) && engineerFilter.includes(assignment.engineerId),
+    );
+  });
+  const projectViewPhases = phases.filter((phase) =>
+    projectViewProjects.some((project) => project.id === phase.projectId),
+  );
   const segments = result.segments.filter((s) => {
     if (!visibleSprintIds.has(s.sprintId)) return false;
     if (engineerFilter.length && !engineerFilter.includes(s.engineerId)) return false;
@@ -257,8 +270,8 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
             />
           ) : (
             <ProjectGrid
-              projects={projects}
-              phases={phases}
+              projects={projectViewProjects}
+              phases={projectViewPhases}
               engineers={intent.engineers}
               assignments={intent.assignments}
               sprints={visibleSprints}

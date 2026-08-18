@@ -15,7 +15,41 @@ export const PROJECT_COLORS = [
 
 export type ProjectColorId = (typeof PROJECT_COLORS)[number]["id"];
 
+type ProjectColor = {
+  id: string;
+  label: string;
+  fill: string;
+  ink: string;
+  solid: string;
+  pale: string;
+  border: string;
+};
+
+function isHexColor(value: string) {
+  return /^#[0-9a-f]{6}$/i.test(value);
+}
+
+function customProjectColor(value: string): ProjectColor {
+  const red = Number.parseInt(value.slice(1, 3), 16);
+  const green = Number.parseInt(value.slice(3, 5), 16);
+  const blue = Number.parseInt(value.slice(5, 7), 16);
+  const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+  const ink = luminance > 0.55 ? "#1c1917" : "#fffdf8";
+
+  return {
+    id: value,
+    label: value.toUpperCase(),
+    solid: value,
+    fill: `color-mix(in srgb, ${value} 45%, white)`,
+    pale: `color-mix(in srgb, ${value} 18%, white)`,
+    border: value,
+    ink,
+  };
+}
+
 export function projectColor(value?: string | number | null) {
   if (typeof value === "number") return PROJECT_COLORS[value % PROJECT_COLORS.length]!;
+  if (typeof value === "string" && isHexColor(value)) return customProjectColor(value);
+  if (value === "violet") return customProjectColor("#7c3aed");
   return PROJECT_COLORS.find((color) => color.id === value) ?? PROJECT_COLORS[0];
 }
