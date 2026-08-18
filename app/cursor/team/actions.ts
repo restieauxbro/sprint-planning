@@ -1,6 +1,8 @@
 "use server";
 
-import { addEngineer, renameEngineer } from "@/lib/db";
+import { addEngineer, getDb, renameEngineer } from "@/lib/db";
+import { engineers } from "@/lib/schema";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export type AddTeammateState = { error: string | null; added: boolean };
@@ -30,4 +32,14 @@ export async function renameTeammate(id: string, name: string): Promise<{ error:
   if (!result.ok) return { error: result.error };
   refreshTeam();
   return { error: null };
+}
+
+export async function updateTeammateTags(id: string, tags: string): Promise<{ error: string | null }> {
+  try {
+    getDb().update(engineers).set({ tags: tags.trim() }).where(eq(engineers.id, id)).run();
+    refreshTeam();
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }

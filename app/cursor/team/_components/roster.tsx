@@ -1,6 +1,6 @@
 "use client";
 
-import { addTeammate, renameTeammate, type AddTeammateState } from "../actions";
+import { addTeammate, renameTeammate, updateTeammateTags, type AddTeammateState } from "../actions";
 import { Button } from "@/components/ui/button";
 import type { Engineer } from "@/lib/schema";
 import { initials } from "../../_components/colors";
@@ -42,6 +42,7 @@ export function TeamRoster({ people }: { people: Engineer[] }) {
                   <div className="min-w-0 flex-1">
                     <PersonName person={person} />
                     <p className="font-mono text-[11px] text-stone-500">{person.id}</p>
+                    <PersonTags person={person} />
                   </div>
                   <p className="font-mono text-[11px] text-stone-600">{person.fte.toFixed(1)} FTE</p>
                 </li>
@@ -52,6 +53,75 @@ export function TeamRoster({ people }: { people: Engineer[] }) {
 
         <AddTeammateForm />
       </div>
+    </div>
+  );
+}
+
+function splitTags(value: string) {
+  return value.split(",").map((tag) => tag.trim()).filter(Boolean);
+}
+
+function PersonTags({ person }: { person: Engineer }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(person.tags ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const tags = splitTags(person.tags ?? "");
+
+  useEffect(() => setValue(person.tags ?? ""), [person.tags]);
+
+  function save() {
+    startTransition(async () => {
+      const result = await updateTeammateTags(person.id, value);
+      setError(result.error);
+      if (!result.error) setEditing(false);
+    });
+  }
+
+  if (editing) {
+    return (
+      <div className="mt-2 flex max-w-md flex-wrap items-center gap-2">
+        <input
+          aria-label={`${person.name} tags`}
+          autoFocus
+          value={value}
+          disabled={pending}
+          placeholder="AI Team, Launchpad"
+          onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              save();
+            }
+            if (event.key === "Escape") {
+              setValue(person.tags ?? "");
+              setError(null);
+              setEditing(false);
+            }
+          }}
+          className="h-7 min-w-48 flex-1 rounded-sm border border-stone-400 bg-[#faf7ef] px-1.5 text-sm outline-none focus:border-stone-800"
+        />
+        <Button type="button" size="xs" disabled={pending} onClick={save}>
+          {pending ? "Saving…" : "Save"}
+        </Button>
+        <Button type="button" variant="outline" size="xs" disabled={pending} onClick={() => { setValue(person.tags ?? ""); setError(null); setEditing(false); }}>
+          Cancel
+        </Button>
+        {error && <p className="w-full text-xs text-[#7c2d12]">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      {tags.map((tag) => (
+        <span key={tag} className="rounded-full border border-stone-300 bg-[#faf7ef] px-1.5 py-0.5 font-mono text-[10px] text-stone-600">
+          {tag}
+        </span>
+      ))}
+      <button type="button" onClick={() => setEditing(true)} className="font-mono text-[10px] text-stone-500 hover:text-stone-900 hover:underline">
+        {tags.length ? "Edit tags" : "Add tags"}
+      </button>
     </div>
   );
 }

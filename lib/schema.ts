@@ -5,6 +5,7 @@ export const engineers = sqliteTable("engineers", {
   name: text("name").notNull(),
   title: text("title").notNull().default("Engineer"),
   fte: real("fte").notNull().default(1),
+  tags: text("tags").notNull().default(""),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -22,6 +23,7 @@ export const projects = sqliteTable("projects", {
   code: text("code").notNull(),
   color: text("color").notNull().default("teal"),
   priority: integer("priority").notNull().default(1),
+  tags: text("tags").notNull().default(""),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
@@ -61,13 +63,17 @@ export const timeOff = sqliteTable(
       .notNull()
       .references(() => sprints.id, { onDelete: "cascade" }),
     daysOff: real("days_off").notNull(),
+    placement: text("placement").notNull().default("start"),
   },
   (table) => [primaryKey({ columns: [table.engineerId, table.sprintId] })],
 );
 
-export type Engineer = typeof engineers.$inferSelect;
+export type Engineer = Omit<typeof engineers.$inferSelect, "tags"> & { tags?: string | null };
 export type Sprint = typeof sprints.$inferSelect;
-export type Project = Omit<typeof projects.$inferSelect, "color"> & { color?: string | null };
+export type Project = Omit<typeof projects.$inferSelect, "color" | "tags"> & {
+  color?: string | null;
+  tags?: string | null;
+};
 export type Phase = typeof phases.$inferSelect;
 export type Assignment = typeof assignments.$inferSelect;
 export type TimeOff = typeof timeOff.$inferSelect;

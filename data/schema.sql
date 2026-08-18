@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS engineers (
   name TEXT NOT NULL,
   title TEXT NOT NULL DEFAULT 'Engineer', -- Engineer, BA, …
   fte REAL NOT NULL DEFAULT 1.0 CHECK (fte > 0),
+  tags TEXT NOT NULL DEFAULT '', -- comma-separated labels, maintained on the Team page
   sort_order INTEGER NOT NULL DEFAULT 0
 );
 
@@ -33,6 +34,7 @@ CREATE TABLE IF NOT EXISTS projects (
   code TEXT NOT NULL, -- short label on bars: letters, emoji, whatever (Chk, 🧠)
   color TEXT NOT NULL DEFAULT 'teal', -- palette id used on planner cards
   priority INTEGER NOT NULL DEFAULT 1 CHECK (priority >= 1),
+  tags TEXT NOT NULL DEFAULT '', -- comma-separated labels, maintained on the Projects page
   sort_order INTEGER NOT NULL DEFAULT 0
 );
 
@@ -57,5 +59,6 @@ CREATE TABLE IF NOT EXISTS time_off (
   engineer_id TEXT NOT NULL REFERENCES engineers(id) ON DELETE CASCADE,
   sprint_id TEXT NOT NULL REFERENCES sprints(id) ON DELETE CASCADE,
   days_off REAL NOT NULL CHECK (days_off >= 0),
+  placement TEXT NOT NULL DEFAULT 'start' CHECK (placement IN ('start', 'end')),
   PRIMARY KEY (engineer_id, sprint_id)
 );

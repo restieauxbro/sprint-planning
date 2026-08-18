@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { ScheduleIntent } from "@/lib/schema";
 import { cn } from "@/lib/utils";
-import { ChevronDownIcon, EyeIcon, RefreshCwIcon } from "lucide-react";
+import { ChevronDownIcon, EyeIcon, RefreshCwIcon, XIcon } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import type { ScheduleResult } from "../_lib/schedule";
 import { projectCode, projectInk } from "./colors";
@@ -137,7 +137,11 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
             onChange={setProjectFilter}
           />
           <FilterMenu
-            label={engineerFilter.length ? `${engineerFilter.length} people` : "People"}
+            label={
+              engineerFilter.length
+                ? `${engineerFilter.length} ${engineerFilter.length === 1 ? "person" : "people"}`
+                : "People"
+            }
             items={intent.engineers.map((e) => ({ id: e.id, name: e.name }))}
             selected={engineerFilter}
             onChange={setEngineerFilter}
@@ -392,50 +396,72 @@ function FilterMenu({
   single?: boolean;
   swatch?: string;
 }) {
+  const clearable = !single && selected.length > 0;
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1")}>
-        {swatch && (
-          <span className="size-2.5 rounded-sm" style={{ background: swatch }} />
-        )}
-        {label}
-        <ChevronDownIcon className="size-3.5" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-52">
-        {single ? (
-          <DropdownMenuRadioGroup
-            value={selected[0] ?? ""}
-            onValueChange={(value) => onChange(value ? [value] : [])}
-          >
-            <DropdownMenuLabel>Highlight</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {items.map((item) => (
-              <DropdownMenuRadioItem key={item.id || "none"} value={item.id}>
-                <FilterItemLabel item={item} />
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        ) : (
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Filter</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {items.map((item) => (
-              <DropdownMenuCheckboxItem
-                key={item.id || "none"}
-                checked={selected.includes(item.id)}
-                onCheckedChange={(checked) => {
-                  onChange(
-                    checked ? [...selected, item.id] : selected.filter((id) => id !== item.id),
-                  );
-                }}
-              >
-                <FilterItemLabel item={item} />
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuGroup>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex">
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "gap-1",
+            clearable && "rounded-r-none",
+          )}
+        >
+          {swatch && (
+            <span className="size-2.5 rounded-sm" style={{ background: swatch }} />
+          )}
+          {label}
+          <ChevronDownIcon className="size-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-52">
+          {single ? (
+            <DropdownMenuRadioGroup
+              value={selected[0] ?? ""}
+              onValueChange={(value) => onChange(value ? [value] : [])}
+            >
+              <DropdownMenuLabel>Highlight</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {items.map((item) => (
+                <DropdownMenuRadioItem key={item.id || "none"} value={item.id}>
+                  <FilterItemLabel item={item} />
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          ) : (
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Filter</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {items.map((item) => (
+                <DropdownMenuCheckboxItem
+                  key={item.id || "none"}
+                  checked={selected.includes(item.id)}
+                  onCheckedChange={(checked) => {
+                    onChange(
+                      checked ? [...selected, item.id] : selected.filter((id) => id !== item.id),
+                    );
+                  }}
+                >
+                  <FilterItemLabel item={item} />
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuGroup>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {clearable && (
+        <Button
+          variant="outline"
+          size="icon-sm"
+          className="-ml-px rounded-l-none"
+          aria-label={`Clear ${label} filter`}
+          title={`Clear ${label} filter`}
+          onClick={() => onChange([])}
+        >
+          <XIcon />
+        </Button>
+      )}
+    </div>
   );
 }
 

@@ -19,6 +19,7 @@ export type EngineerSprintLoad = {
   engineerId: string;
   capacityDays: number;
   timeOffDays: number;
+  timeOffPlacement: "start" | "end";
   deliveredDays: number;
   idleDays: number;
   requestedFractionSum: number;
@@ -197,9 +198,10 @@ export function schedule(intent: ScheduleIntent, today?: string): ScheduleResult
     const intended: Intended[] = [];
 
     for (const engineer of engineers) {
-      const daysOff =
-        timeOff.find((t) => t.engineerId === engineer.id && t.sprintId === sprint.id)?.daysOff ??
-        0;
+      const leave = timeOff.find(
+        (t) => t.engineerId === engineer.id && t.sprintId === sprint.id,
+      );
+      const daysOff = leave?.daysOff ?? 0;
       const capacityDays = Math.max(0, engineer.fte * sprint.workingDays - daysOff);
       const eligibleRows = (assignmentsByEngineer.get(engineer.id) ?? []).filter((a) =>
         eligible.has(a.phaseId),
@@ -236,6 +238,7 @@ export function schedule(intent: ScheduleIntent, today?: string): ScheduleResult
         engineerId: engineer.id,
         capacityDays,
         timeOffDays: daysOff,
+        timeOffPlacement: leave?.placement === "end" ? "end" : "start",
         deliveredDays: 0,
         idleDays: capacityDays,
         requestedFractionSum: demand,

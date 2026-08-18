@@ -117,6 +117,7 @@ export type AddEngineerInput = {
   name: string;
   title: string;
   fte: number;
+  tags?: string;
 };
 
 export type AddEngineerResult =
@@ -159,7 +160,7 @@ export function addEngineer(input: AddEngineerInput): AddEngineerResult {
     const id = slugifyPersonId(name, new Set(existing.map((row) => row.id)));
     const nextOrder = (db.select({ value: max(engineers.sortOrder) }).from(engineers).get()?.value ?? 0) + 1;
     db.insert(engineers)
-      .values({ id, name, title, fte, sortOrder: nextOrder })
+      .values({ id, name, title, fte, tags: input.tags?.trim() ?? "", sortOrder: nextOrder })
       .run();
     const engineer = db.select().from(engineers).where(eq(engineers.id, id)).get();
     if (!engineer) return { ok: false, error: "Could not read the new teammate back." };
@@ -206,6 +207,7 @@ export function renameEngineer(id: string, name: string): AddEngineerResult {
           name: next,
           title: existing.title,
           fte: existing.fte,
+          tags: existing.tags,
           sortOrder: existing.sortOrder,
         })
         .run();
@@ -228,6 +230,7 @@ export type ProjectInput = {
   code: string;
   color: string;
   priority: number;
+  tags?: string;
 };
 
 export type ProjectResult =
@@ -263,7 +266,7 @@ function validateProject(input: ProjectInput): { ok: true; value: ProjectInput }
   if (!Number.isInteger(priority) || priority < 1) {
     return { ok: false, error: "Priority must be a whole number of 1 or higher." };
   }
-  return { ok: true, value: { name, code, color, priority } };
+  return { ok: true, value: { name, code, color, priority, tags: input.tags?.trim() ?? "" } };
 }
 
 export function addProject(input: ProjectInput): ProjectResult {

@@ -193,13 +193,25 @@ function CapacityCell({
 }) {
   const working = sprint.workingDays;
   const ptoPct = ((load?.timeOffDays ?? 0) / working) * 100;
+  const capacityPct = ((load?.capacityDays ?? 0) / working) * 100;
+  const leaveAtEnd = load?.timeOffPlacement === "end";
   const unavailablePct =
     ((working - (load?.timeOffDays ?? 0) - (load?.capacityDays ?? 0)) / working) * 100;
   // Queued work has no physical place in a fully unavailable sprint. Rendering it
   // beside 100% leave forces the flex layout to squeeze it into misleading slivers.
   const visibleSegments = (load?.capacityDays ?? 0) > 0 ? segments : [];
-  const rows = packRequestedRows(visibleSegments, working);
+  const rows = packRequestedRows(visibleSegments, load?.capacityDays ?? 0);
   const stacked = rows.length > 1;
+
+  const leave = ptoPct > 0.5 && (
+    <div
+      className="flex items-center justify-center border-r border-stone-400/40 bg-[repeating-linear-gradient(-45deg,transparent,transparent_3px,#c4b8a0_3px,#c4b8a0_4px)] text-[9px] text-stone-600"
+      style={{ width: `${ptoPct}%` }}
+      title={`Leave ${load?.timeOffDays}d`}
+    >
+      Leave
+    </div>
+  );
 
   return (
     <div
@@ -210,23 +222,15 @@ function CapacityCell({
       )}
     >
       <div className={cn("flex min-h-0 flex-1", stacked ? "flex-col" : "flex-row")}>
-        {ptoPct > 0.5 && (
-          <div
-            className="flex items-center justify-center border-r border-stone-400/40 bg-[repeating-linear-gradient(-45deg,transparent,transparent_3px,#c4b8a0_3px,#c4b8a0_4px)] text-[9px] text-stone-600"
-            style={{ width: `${ptoPct}%` }}
-          title={`Leave ${load?.timeOffDays}d`}
-          >
-            Leave
-          </div>
-        )}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {!leaveAtEnd && leave}
+        <div className="flex min-h-0 min-w-0 flex-col" style={{ width: `${capacityPct}%` }}>
           {rows.map((row, rowIdx) => (
             <div key={rowIdx} className="flex min-h-7 flex-1">
               {row.map((seg) => (
                 <SegmentButton
                   key={`${seg.phaseId}:${seg.engineerId}`}
                   seg={seg}
-                  workingDays={working}
+                  capacityDays={load?.capacityDays ?? 0}
                   engineer={engineer}
                   projects={projects}
                   phases={phases}
@@ -250,21 +254,22 @@ function CapacityCell({
                       selected.sprintId === sprint.id &&
                       "ring-2 ring-inset ring-stone-900",
                   )}
-                  style={{ width: `${((load?.idleDays ?? 0) / working) * 100}%` }}
+                  style={{ width: `${((load?.idleDays ?? 0) / (load?.capacityDays ?? 1)) * 100}%` }}
                 >
                   <span className="px-1">idle {load?.idleDays.toFixed(0)}d</span>
                 </button>
               )}
-              {rowIdx === rows.length - 1 && unavailablePct > 0.5 && (
-                <div
-                  className="h-full bg-stone-300/50"
-                  style={{ width: `${unavailablePct}%` }}
-                  title="Below 1.0 FTE"
-                />
-              )}
             </div>
           ))}
         </div>
+        {leaveAtEnd && leave}
+        {unavailablePct > 0.5 && (
+          <div
+            className="h-full bg-stone-300/50"
+            style={{ width: `${unavailablePct}%` }}
+            title="Below 1.0 FTE"
+          />
+        )}
       </div>
       {load?.overloaded && (
         <span className="absolute top-0.5 right-0.5 z-10 rounded-sm bg-[#9a3412] px-1 text-[9px] font-medium text-white">
@@ -275,23 +280,23 @@ function CapacityCell({
   );
 }
 
-function barWidth(seg: CellSegment, workingDays: number) {
+function barWidth(seg: CellSegment, capacityDays: number) {
   if (seg.unfilled) return seg.requestedFraction;
-  if (workingDays <= 0) return 0;
-  return seg.days / workingDays;
+  if (capacityDays <= 0) return 0;
+  return seg.days / capacityDays;
 }
 
-function packRequestedRows(segments: CellSegment[], workingDays: number): CellSegment[][] {
+function packRequestedRows(segments: CellSegment[], capacityDays: number): CellSegment[][] {
   if (segments.length === 0) return [[]];
   const ordered = [...segments].sort((a, b) => {
     if (a.unfilled !== b.unfilled) return a.unfilled ? 1 : -1;
-    return barWidth(b, workingDays) - barWidth(a, workingDays);
+    return barWidth(b, capacityDays) - barWidth(a, capacityDays);
   });
   const rows: CellSegment[][] = [];
   let current: CellSegment[] = [];
   let used = 0;
   for (const seg of ordered) {
-    const width = barWidth(seg, workingDays);
+    const width = barWidth(seg, capacityDays);
     if (current.length > 0 && used + width > 1.001) {
       rows.push(current);
       current = [];
@@ -306,7 +311,7 @@ function packRequestedRows(segments: CellSegment[], workingDays: number): CellSe
 
 function SegmentButton({
   seg,
-  workingDays,
+  capacityDays,
   engineer,
   projects,
   phases,
@@ -317,7 +322,7 @@ function SegmentButton({
   showProjectName,
 }: {
   seg: CellSegment;
-  workingDays: number;
+  capacityDays: number;
   engineer: Engineer;
   projects: Project[];
   phases: Phase[];
@@ -332,7 +337,7 @@ function SegmentButton({
   const ink = projectInk(project?.color ?? projectIndex.get(seg.projectId) ?? 0);
   const dim = highlightProjectId != null && highlightProjectId !== seg.projectId;
   const isSelected = selected?.kind === "phase" && selected.phaseId === seg.phaseId;
-  const widthFrac = barWidth(seg, workingDays);
+  const widthFrac = barWidth(seg, capacityDays);
   const labelPct = Math.round(seg.requestedFraction * 100);
 
   return (

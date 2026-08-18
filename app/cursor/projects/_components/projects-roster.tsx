@@ -40,18 +40,50 @@ export function ProjectsRoster({ projects }: { projects: Project[] }) {
 }
 
 function ProjectRow({ project }: { project: Project }) {
+  const [editing, setEditing] = useState(false);
   const [name, setName] = useState(project.name);
   const [code, setCode] = useState(project.code);
   const [color, setColor] = useState(project.color ?? "teal");
   const [priority, setPriority] = useState(String(project.priority));
+  const [tags, setTags] = useState(project.tags ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function save() {
     startTransition(async () => {
-      const result = await editProject(project.id, name, code, color, Number(priority));
+      const result = await editProject(project.id, name, code, color, Number(priority), tags);
       setError(result.error);
+      if (!result.error) setEditing(false);
     });
+  }
+
+  function cancel() {
+    setName(project.name);
+    setCode(project.code);
+    setColor(project.color ?? "teal");
+    setPriority(String(project.priority));
+    setTags(project.tags ?? "");
+    setError(null);
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-start gap-3 px-3 py-3">
+        <span className="size-3 shrink-0 rounded-sm" style={{ background: projectColor(project.color).solid }} aria-label={`${projectColor(project.color).label} project colour`} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-medium leading-none">{project.name}</span>
+            <span className="font-mono text-[10px] text-stone-500">{project.code}</span>
+            <TagChips value={project.tags ?? ""} />
+          </div>
+          <p className="mt-1 font-mono text-[10px] text-stone-500">Priority {project.priority} · {project.id}</p>
+        </div>
+        <Button type="button" variant="outline" size="sm" className="-mt-1" onClick={() => setEditing(true)}>
+          Edit
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -68,7 +100,14 @@ function ProjectRow({ project }: { project: Project }) {
         <span className="font-mono text-[10px] tracking-wide text-stone-500 uppercase">Priority</span>
         <input aria-label="Project priority" type="number" min={1} step={1} value={priority} disabled={pending} onChange={(event) => setPriority(event.target.value)} className="mt-1 h-8 w-full rounded-md border border-stone-300 bg-[#f4f0e6] px-2 text-sm outline-none focus:border-stone-800" />
       </label>
-      <Button type="button" onClick={save} disabled={pending} className="h-8">{pending ? "Saving…" : "Save"}</Button>
+      <div className="flex gap-2">
+        <Button type="button" onClick={save} disabled={pending} className="h-8">{pending ? "Saving…" : "Save"}</Button>
+        <Button type="button" variant="outline" onClick={cancel} disabled={pending} className="h-8">Cancel</Button>
+      </div>
+      <label className="block sm:col-span-4">
+        <span className="font-mono text-[10px] tracking-wide text-stone-500 uppercase">Tags</span>
+        <input aria-label="Project tags" value={tags} disabled={pending} placeholder="Launchpad, AI Team" onChange={(event) => setTags(event.target.value)} className="mt-1 h-8 w-full rounded-md border border-stone-300 bg-[#f4f0e6] px-2 text-sm outline-none focus:border-stone-800" />
+      </label>
       <div className="sm:col-span-4">
         <p className="font-mono text-[10px] tracking-wide text-stone-500 uppercase">Colour</p>
         <ColourPicker value={color} onChange={setColor} disabled={pending} />
@@ -99,6 +138,10 @@ function AddProjectForm() {
           <span className="font-mono text-[10px] tracking-wide text-stone-500 uppercase">Name</span>
           <input name="name" required placeholder="Payments" className="mt-1 h-8 w-full rounded-md border border-stone-300 bg-[#f4f0e6] px-2 text-sm outline-none focus:border-stone-800" />
         </label>
+        <label className="block sm:col-span-3">
+          <span className="font-mono text-[10px] tracking-wide text-stone-500 uppercase">Tags</span>
+          <input name="tags" placeholder="Launchpad, AI Team" className="mt-1 h-8 w-full rounded-md border border-stone-300 bg-[#f4f0e6] px-2 text-sm outline-none focus:border-stone-800" />
+        </label>
         <label className="block">
           <span className="font-mono text-[10px] tracking-wide text-stone-500 uppercase">Card code</span>
           <input name="code" required placeholder="Pay" className="mt-1 h-8 w-full rounded-md border border-stone-300 bg-[#f4f0e6] px-2 text-sm outline-none focus:border-stone-800" />
@@ -116,6 +159,21 @@ function AddProjectForm() {
       </form>
       {state.error && <p className="mt-3 text-sm text-[#7c2d12]">{state.error}</p>}
     </section>
+  );
+}
+
+function TagChips({ value }: { value: string }) {
+  const tags = value.split(",").map((tag) => tag.trim()).filter(Boolean);
+  if (!tags.length) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {tags.map((tag) => (
+        <span key={tag} className="rounded-full border border-stone-300 bg-[#faf7ef] px-1.5 py-0.5 font-mono text-[10px] text-stone-600">
+          {tag}
+        </span>
+      ))}
+    </div>
   );
 }
 
