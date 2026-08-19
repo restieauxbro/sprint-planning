@@ -37,13 +37,15 @@ export function ProjectGrid({
   projectIndex: Map<string, number>;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const scheduled = projects.map((project) => ({
-    project,
-    phases: phases
-      .filter((p) => p.projectId === project.id)
-      .filter((p) => !timelines.find((t) => t.phaseId === p.id)?.unscheduled)
-      .sort((a, b) => a.sortOrder - b.sortOrder),
-  }));
+  const scheduled = [...projects]
+    .sort((a, b) => a.priority - b.priority || a.sortOrder - b.sortOrder)
+    .map((project) => ({
+      project,
+      phases: phases
+        .filter((p) => p.projectId === project.id)
+        .filter((p) => !timelines.find((t) => t.phaseId === p.id)?.unscheduled)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    }));
   const unscheduledPhases = timelines
     .filter((t) => t.unscheduled)
     .map((t) => phases.find((p) => p.id === t.phaseId)!)
@@ -250,15 +252,16 @@ function PhaseRow({
 
   return (
     <div
-      className="col-span-full grid"
+      className="col-span-full grid h-[52px]"
       style={{ gridTemplateColumns: `220px repeat(${sprints.length}, minmax(112px, 1fr))` }}
     >
       <button
         type="button"
         onClick={() => onSelect({ kind: "phase", phaseId: phase.id })}
-        className="sticky left-0 z-20 border-b border-stone-300 bg-[#f4f0e6] px-3 py-2 text-left hover:bg-[#ebe4d4]"
+        title={phase.name}
+        className="sticky left-0 z-20 min-w-0 border-b border-stone-300 bg-[#f4f0e6] px-3 py-2 text-left hover:bg-[#ebe4d4]"
       >
-        <p className="text-[13px] text-stone-800">{phase.name}</p>
+        <p className="truncate whitespace-nowrap text-[13px] text-stone-800">{phase.name}</p>
         <p className="font-mono text-[10px] text-stone-500">
           {formatEffortDays(phase.effortDays)}
           {unscheduled ? " · no one" : ""}
@@ -269,7 +272,7 @@ function PhaseRow({
           <div
             key={sprint.id}
             className={cn(
-              "relative h-12 border-b border-l border-stone-300",
+              "relative h-full border-b border-l border-stone-300",
               sprint.id === currentSprintId && "bg-transparent",
             )}
             style={{ gridColumn: idx + 2, gridRow: 1 }}

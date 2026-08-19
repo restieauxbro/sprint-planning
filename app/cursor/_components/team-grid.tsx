@@ -83,9 +83,9 @@ export function TeamGrid({
 
       {(sections.length ? groupedPeople : [{ section: null, people: engineers }]).flatMap(({ section, people }) => [
         section ? (
-          <div key={`${section.id}-divider`} style={{ gridColumn: "1 / -1" }} className="border-b border-stone-300 bg-[#f4f0e6]">
-            <div className="sticky left-0 z-10 flex w-fit min-w-[112px] items-center gap-2 bg-[#f4f0e6] px-3 py-1.5">
-              <span className="font-heading text-sm font-medium text-stone-800">{section.name}</span>
+          <div key={`${section.id}-divider`} style={{ gridColumn: "1 / -1" }} className="flex h-14 items-center border-b border-stone-400 bg-[#f4f0e6]">
+            <div className="sticky left-0 z-10 flex w-fit min-w-[112px] items-center gap-2 bg-[#f4f0e6] px-3 py-2">
+              <span className="text-sm font-medium text-stone-800">{section.name}</span>
               <span className="font-mono text-[10px] text-stone-500">{people.length}</span>
             </div>
           </div>
@@ -289,7 +289,7 @@ function CapacityCell({
         )}
       </div>
       {load?.overloaded && (
-        <span className="absolute top-0.5 right-0.5 z-10 rounded-sm bg-[#9a3412] px-1 text-[9px] font-medium text-white">
+        <span className="absolute top-0.5 right-0.5 rounded-sm bg-[#9a3412] px-1 text-[9px] font-medium text-white">
           {Math.round(load.requestedFractionSum * 100)}%
         </span>
       )}
