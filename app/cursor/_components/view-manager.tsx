@@ -109,6 +109,13 @@ export function ViewManager({
     setError(null);
   }
 
+  function applyUnsavedView() {
+    onApply({ ...currentConfig, sections: [] });
+    onActiveViewChange(null);
+    setDraft(null);
+    setError(null);
+  }
+
   function saveDraft() {
     if (!draft) return;
     setError(null);
@@ -219,6 +226,15 @@ export function ViewManager({
               </div>
 
               <div className="mt-4 space-y-2">
+                <div className={cn("rounded-lg border p-3", activeViewId === null ? "border-stone-800 bg-[#efeae0]" : "border-stone-250 bg-[#faf7ef]")}>
+                  <button type="button" className="flex w-full items-start gap-3 text-left" onClick={applyUnsavedView}>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium">No saved view</span>
+                      <span className="mt-1 block text-xs text-stone-500">Keep current board settings without team dividers.</span>
+                    </span>
+                    {activeViewId === null && <CheckIcon className="mt-0.5 size-4 text-stone-800" />}
+                  </button>
+                </div>
                 {views.length === 0 && (
                   <div className="rounded-lg border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-500">
                     No saved views yet. Your first view will inherit the current board settings.

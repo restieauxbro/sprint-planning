@@ -46,7 +46,7 @@ export function TeamGrid({
   const groupedPeople = sections.map((section) => ({
     section,
     people: peopleInViewSection(section, sections, engineers),
-  }));
+  })).filter((group) => group.people.length > 0);
 
   return (
     <div
@@ -83,9 +83,11 @@ export function TeamGrid({
 
       {(sections.length ? groupedPeople : [{ section: null, people: engineers }]).flatMap(({ section, people }) => [
         section ? (
-          <div key={`${section.id}-divider`} style={{ gridColumn: "1 / -1" }} className="sticky left-0 z-[5] flex items-center gap-2 border-y border-stone-400 bg-[#ddd3bf] px-3 py-1.5">
-            <span className="font-heading text-sm font-medium text-stone-800">{section.name}</span>
-            <span className="font-mono text-[10px] text-stone-500">{people.length}</span>
+          <div key={`${section.id}-divider`} style={{ gridColumn: "1 / -1" }} className="border-b border-stone-300 bg-[#f4f0e6]">
+            <div className="sticky left-0 z-10 flex w-fit min-w-[112px] items-center gap-2 bg-[#f4f0e6] px-3 py-1.5">
+              <span className="font-heading text-sm font-medium text-stone-800">{section.name}</span>
+              <span className="font-mono text-[10px] text-stone-500">{people.length}</span>
+            </div>
           </div>
         ) : null,
         ...people.map((engineer) => (
@@ -107,11 +109,6 @@ export function TeamGrid({
             showProjectName={showProjectName}
           />
         )),
-        section && people.length === 0 ? (
-          <div key={`${section.id}-empty`} style={{ gridColumn: "1 / -1" }} className="border-b border-stone-300 px-3 py-3 text-xs italic text-stone-400">
-            No people match this section
-          </div>
-        ) : null,
       ])}
     </div>
   );
