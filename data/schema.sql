@@ -62,3 +62,15 @@ CREATE TABLE IF NOT EXISTS time_off (
   placement TEXT NOT NULL DEFAULT 'start' CHECK (placement IN ('start', 'end')),
   PRIMARY KEY (engineer_id, sprint_id)
 );
+
+CREATE TABLE IF NOT EXISTS saved_views (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  config TEXT NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS saved_views_one_default
+ON saved_views(is_default) WHERE is_default = 1;

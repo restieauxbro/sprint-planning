@@ -68,6 +68,15 @@ export const timeOff = sqliteTable(
   (table) => [primaryKey({ columns: [table.engineerId, table.sprintId] })],
 );
 
+export const savedViews = sqliteTable("saved_views", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  config: text("config").notNull(),
+  isDefault: integer("is_default").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export type Engineer = Omit<typeof engineers.$inferSelect, "tags"> & { tags?: string | null };
 export type Sprint = typeof sprints.$inferSelect;
 export type Project = Omit<typeof projects.$inferSelect, "color" | "tags"> & {

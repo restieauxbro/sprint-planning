@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { loadIntent } from "@/lib/db";
+import { loadIntent, loadSavedViews } from "@/lib/db";
 import { Board } from "./_components/board";
 import { schedule } from "./_lib/schedule";
 
@@ -23,5 +23,6 @@ export default async function CursorBoardPage() {
   }
 
   const result = schedule(loaded.intent);
-  return <Board intent={loaded.intent} result={result} />;
+  const savedViews = loadSavedViews();
+  return <Board intent={loaded.intent} result={result} savedViews={savedViews} />;
 }

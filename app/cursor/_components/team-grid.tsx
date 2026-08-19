@@ -2,6 +2,7 @@
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Engineer, Phase, Project, Sprint } from "@/lib/schema";
+import { peopleInViewSection, type ViewSection } from "@/lib/saved-views";
 import { cn } from "@/lib/utils";
 import type { CellSegment, EngineerSprintLoad } from "../_lib/schedule";
 import { formatEffortDays } from "../_lib/schedule";
@@ -23,6 +24,7 @@ export function TeamGrid({
   onToggleEngineer,
   projectIndex,
   showProjectName,
+  sections,
 }: {
   engineers: Engineer[];
   roster: Engineer[];
@@ -38,8 +40,13 @@ export function TeamGrid({
   onToggleEngineer: (id: string) => void;
   projectIndex: Map<string, number>;
   showProjectName: boolean;
+  sections: ViewSection[];
 }) {
   const labels = plannerLabels(roster);
+  const groupedPeople = sections.map((section) => ({
+    section,
+    people: peopleInViewSection(section, sections, engineers),
+  }));
 
   return (
     <div
@@ -74,25 +81,38 @@ export function TeamGrid({
         );
       })}
 
-      {engineers.map((engineer) => (
-        <EngineerRow
-          key={engineer.id}
-          engineer={engineer}
-          label={labels.get(engineer.id) ?? engineer.name.trim().split(/\s+/)[0]!}
-          sprints={sprints}
-          projects={projects}
-          phases={phases}
-          segments={segments.filter((s) => s.engineerId === engineer.id)}
-          loads={loads.filter((l) => l.engineerId === engineer.id)}
-          currentSprintId={currentSprintId}
-          highlightProjectId={highlightProjectId}
-          selected={selected}
-          onSelect={onSelect}
-          onToggleEngineer={onToggleEngineer}
-          projectIndex={projectIndex}
-          showProjectName={showProjectName}
-        />
-      ))}
+      {(sections.length ? groupedPeople : [{ section: null, people: engineers }]).flatMap(({ section, people }) => [
+        section ? (
+          <div key={`${section.id}-divider`} style={{ gridColumn: "1 / -1" }} className="sticky left-0 z-[5] flex items-center gap-2 border-y border-stone-400 bg-[#ddd3bf] px-3 py-1.5">
+            <span className="font-heading text-sm font-medium text-stone-800">{section.name}</span>
+            <span className="font-mono text-[10px] text-stone-500">{people.length}</span>
+          </div>
+        ) : null,
+        ...people.map((engineer) => (
+          <EngineerRow
+            key={`${section?.id ?? "all"}-${engineer.id}`}
+            engineer={engineer}
+            label={labels.get(engineer.id) ?? engineer.name.trim().split(/\s+/)[0]!}
+            sprints={sprints}
+            projects={projects}
+            phases={phases}
+            segments={segments.filter((s) => s.engineerId === engineer.id)}
+            loads={loads.filter((l) => l.engineerId === engineer.id)}
+            currentSprintId={currentSprintId}
+            highlightProjectId={highlightProjectId}
+            selected={selected}
+            onSelect={onSelect}
+            onToggleEngineer={onToggleEngineer}
+            projectIndex={projectIndex}
+            showProjectName={showProjectName}
+          />
+        )),
+        section && people.length === 0 ? (
+          <div key={`${section.id}-empty`} style={{ gridColumn: "1 / -1" }} className="border-b border-stone-300 px-3 py-3 text-xs italic text-stone-400">
+            No people match this section
+          </div>
+        ) : null,
+      ])}
     </div>
   );
 }

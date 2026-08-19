@@ -1,19 +1,21 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { asc, eq, max } from "drizzle-orm";
+import { asc, desc, eq, max } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import {
   assignments,
   engineers,
   phases,
   projects,
+  savedViews,
   sprints,
   timeOff,
   type Engineer,
   type Project,
   type ScheduleIntent,
 } from "./schema";
+import { parseViewConfig, type BoardViewConfig, type SavedView } from "./saved-views";
 
 const dbPath =
   process.env.PLANNER_DB ?? path.join(process.cwd(), "data", "planner.sqlite");
@@ -56,8 +58,117 @@ function getClient(): SqliteHandle {
 
 export function getDb() {
   return drizzle(getClient(), {
-    schema: { engineers, sprints, projects, phases, assignments, timeOff },
+    schema: { engineers, sprints, projects, phases, assignments, timeOff, savedViews },
   });
+}
+
+function ensureSavedViewsSchema() {
+  getClient().exec(`
+    CREATE TABLE IF NOT EXISTS saved_views (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      config TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS saved_views_one_default
+    ON saved_views(is_default) WHERE is_default = 1;
+  `);
+}
+
+function toSavedView(row: typeof savedViews.$inferSelect): SavedView | null {
+  try {
+    return {
+      id: row.id,
+      name: row.name,
+      config: parseViewConfig(JSON.parse(row.config)),
+      isDefault: row.isDefault === 1,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function loadSavedViews(): SavedView[] {
+  if (!dbFileExists()) return [];
+  ensureSavedViewsSchema();
+  return getDb().select().from(savedViews).orderBy(desc(savedViews.updatedAt)).all().flatMap((row) => {
+    const parsed = toSavedView(row);
+    return parsed ? [parsed] : [];
+  });
+}
+
+export type SavedViewResult = { ok: true; view: SavedView } | { ok: false; error: string };
+
+export function createSavedView(name: string, config: BoardViewConfig, makeDefault: boolean): SavedViewResult {
+  const cleanName = name.trim();
+  if (!cleanName) return { ok: false, error: "View name is required." };
+  try {
+    ensureSavedViewsSchema();
+    const now = new Date().toISOString();
+    const id = `view_${crypto.randomUUID()}`;
+    getClient().transaction(() => {
+      if (makeDefault) getDb().update(savedViews).set({ isDefault: 0 }).run();
+      getDb().insert(savedViews).values({
+        id,
+        name: cleanName,
+        config: JSON.stringify(parseViewConfig(config)),
+        isDefault: makeDefault ? 1 : 0,
+        createdAt: now,
+        updatedAt: now,
+      }).run();
+    })();
+    const row = getDb().select().from(savedViews).where(eq(savedViews.id, id)).get();
+    const view = row && toSavedView(row);
+    return view ? { ok: true, view } : { ok: false, error: "Could not read the saved view back." };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export function updateSavedView(id: string, name: string, config: BoardViewConfig): SavedViewResult {
+  const cleanName = name.trim();
+  if (!id) return { ok: false, error: "Missing view." };
+  if (!cleanName) return { ok: false, error: "View name is required." };
+  try {
+    ensureSavedViewsSchema();
+    getDb().update(savedViews).set({
+      name: cleanName,
+      config: JSON.stringify(parseViewConfig(config)),
+      updatedAt: new Date().toISOString(),
+    }).where(eq(savedViews.id, id)).run();
+    const row = getDb().select().from(savedViews).where(eq(savedViews.id, id)).get();
+    const view = row && toSavedView(row);
+    return view ? { ok: true, view } : { ok: false, error: "That view no longer exists." };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export function setDefaultSavedView(id: string | null) {
+  try {
+    ensureSavedViewsSchema();
+    getClient().transaction(() => {
+      getDb().update(savedViews).set({ isDefault: 0 }).run();
+      if (id) getDb().update(savedViews).set({ isDefault: 1 }).where(eq(savedViews.id, id)).run();
+    })();
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export function deleteSavedView(id: string) {
+  try {
+    ensureSavedViewsSchema();
+    getDb().delete(savedViews).where(eq(savedViews.id, id)).run();
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export type LoadIntentResult =

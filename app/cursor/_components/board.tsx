@@ -14,8 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ScheduleIntent } from "@/lib/schema";
+import type { BoardViewConfig, SavedView } from "@/lib/saved-views";
 import { cn } from "@/lib/utils";
-import { ChevronDownIcon, EyeIcon, RefreshCwIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, RefreshCwIcon, XIcon } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import type { ScheduleResult } from "../_lib/schedule";
 import { projectCode, projectInk } from "./colors";
@@ -24,20 +25,46 @@ import { ProjectGrid } from "./project-grid";
 import type { Selection } from "./selection";
 import { TeamGrid } from "./team-grid";
 import { usePlanWatch } from "./use-plan-watch";
+import { ViewManager } from "./view-manager";
 
 const HORIZONS = [6, 8, 12, 0] as const;
 
-export function Board({ intent, result }: { intent: ScheduleIntent; result: ScheduleResult }) {
+export function Board({ intent, result, savedViews }: { intent: ScheduleIntent; result: ScheduleResult; savedViews: SavedView[] }) {
   const { live, flash, updatedAt, refresh } = usePlanWatch();
-  const [lens, setLens] = useState<"team" | "projects">("team");
-  const [horizon, setHorizon] = useState<number>(8);
-  const [projectFilter, setProjectFilter] = useState<string[]>([]);
-  const [engineerFilter, setEngineerFilter] = useState<string[]>([]);
-  const [highlightProjectId, setHighlightProjectId] = useState<string | null>(null);
-  const [showProjectName, setShowProjectName] = useState(true);
+  const defaultView = savedViews.find((view) => view.isDefault) ?? null;
+  const initialConfig = defaultView?.config;
+  const [lens, setLens] = useState<"team" | "projects">(initialConfig?.lens ?? "team");
+  const [horizon, setHorizon] = useState<number>(initialConfig?.horizon ?? 8);
+  const [projectFilter, setProjectFilter] = useState<string[]>(initialConfig?.projectFilter ?? []);
+  const [engineerFilter, setEngineerFilter] = useState<string[]>(initialConfig?.engineerFilter ?? []);
+  const [highlightProjectId, setHighlightProjectId] = useState<string | null>(initialConfig?.highlightProjectId ?? null);
+  const [showProjectName, setShowProjectName] = useState(initialConfig?.showProjectName ?? true);
+  const [sections, setSections] = useState(initialConfig?.sections ?? []);
+  const [activeViewId, setActiveViewId] = useState<string | null>(defaultView?.id ?? null);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
+
+  const currentViewConfig = useMemo<BoardViewConfig>(() => ({
+    lens,
+    horizon,
+    projectFilter,
+    engineerFilter,
+    highlightProjectId,
+    showProjectName,
+    sections,
+  }), [lens, horizon, projectFilter, engineerFilter, highlightProjectId, showProjectName, sections]);
+
+  function applyViewConfig(config: BoardViewConfig) {
+    setLens(config.lens);
+    setHorizon(config.horizon);
+    setProjectFilter(config.projectFilter);
+    setEngineerFilter(config.engineerFilter);
+    setHighlightProjectId(config.highlightProjectId);
+    setShowProjectName(config.showProjectName);
+    setSections(config.sections);
+    setSelected(null);
+  }
 
   const projectIndex = useMemo(() => {
     const map = new Map<string, number>();
@@ -187,8 +214,13 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
                 : undefined
             }
           />
-          <ViewMenu
-            showProjectName={showProjectName}
+          <ViewManager
+            initialViews={savedViews}
+            engineers={intent.engineers}
+            currentConfig={currentViewConfig}
+            activeViewId={activeViewId}
+            onApply={applyViewConfig}
+            onActiveViewChange={setActiveViewId}
             onShowProjectNameChange={setShowProjectName}
           />
           <Button variant="outline" size="sm" onClick={copySnapshot}>
@@ -267,6 +299,7 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
               onToggleEngineer={toggleEngineer}
               projectIndex={projectIndex}
               showProjectName={showProjectName}
+              sections={sections}
             />
           ) : (
             <ProjectGrid
@@ -298,36 +331,6 @@ export function Board({ intent, result }: { intent: ScheduleIntent; result: Sche
         )}
       </div>
     </div>
-  );
-}
-
-function ViewMenu({
-  showProjectName,
-  onShowProjectNameChange,
-}: {
-  showProjectName: boolean;
-  onShowProjectNameChange: (show: boolean) => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1")}>
-        <EyeIcon className="size-3.5" />
-        View
-        <ChevronDownIcon className="size-3.5" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-52">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Show on cards</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuCheckboxItem
-            checked={showProjectName}
-            onCheckedChange={onShowProjectNameChange}
-          >
-            Project name
-          </DropdownMenuCheckboxItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
