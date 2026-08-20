@@ -16,7 +16,6 @@ export function ProjectGrid({
   assignments,
   sprints,
   timelines,
-  currentSprintId,
   highlightProjectId,
   selected,
   onSelect,
@@ -29,7 +28,6 @@ export function ProjectGrid({
   assignments: Assignment[];
   sprints: Sprint[];
   timelines: PhaseTimeline[];
-  currentSprintId: string | null;
   highlightProjectId: string | null;
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
@@ -58,14 +56,11 @@ export function ProjectGrid({
         gridTemplateColumns: `220px repeat(${sprints.length}, minmax(112px, 1fr))`,
       }}
     >
-      <div className="sticky top-0 left-0 z-30 border-b border-stone-300 bg-[#efeae0]" />
+      <div className="sticky top-0 left-0 z-30 border-r border-b border-stone-300 bg-[#efeae0]" />
       {sprints.map((sprint) => (
         <div
           key={sprint.id}
-          className={cn(
-            "sticky top-0 z-20 border-b border-l border-stone-300 bg-[#efeae0] px-2 py-2",
-            sprint.id === currentSprintId && "bg-stone-100",
-          )}
+          className="sticky top-0 z-20 border-b border-l border-stone-300 bg-[#efeae0] px-2 py-2"
         >
           <p className="font-mono text-[11px] text-stone-600">{sprint.name}</p>
           <p className="font-mono text-[9px] text-stone-500">
@@ -94,7 +89,7 @@ export function ProjectGrid({
             <button
               type="button"
               onClick={() => onHighlight(project.id)}
-              className="sticky left-0 z-20 flex items-start gap-1 border-b border-stone-300 bg-[#ebe4d4] px-2 py-2 text-left"
+              className="sticky left-0 z-20 flex items-start gap-1 border-r border-b border-stone-300 bg-[#ebe4d4] px-2 py-2 text-left"
             >
               <span
                 role="presentation"
@@ -131,10 +126,7 @@ export function ProjectGrid({
             {sprints.map((sprint) => (
               <div
                 key={sprint.id}
-                className={cn(
-                  "border-b border-l border-stone-300",
-                  sprint.id === currentSprintId ? "bg-transparent" : "bg-[#ebe4d4]/40",
-                )}
+                className="border-b border-l border-stone-300 bg-[#ebe4d4]/40"
               />
             ))}
             {!isCollapsed &&
@@ -147,7 +139,6 @@ export function ProjectGrid({
                   assignments={assignments.filter((a) => a.phaseId === phase.id)}
                   sprints={sprints}
                   timeline={timelines.find((t) => t.phaseId === phase.id)}
-                  currentSprintId={currentSprintId}
                   highlightProjectId={highlightProjectId}
                   selected={selected}
                   onSelect={onSelect}
@@ -160,7 +151,7 @@ export function ProjectGrid({
 
       {unscheduledPhases.length > 0 && (
         <>
-          <div className="sticky left-0 z-10 border-b border-stone-300 bg-[#f3e4d4] px-3 py-2">
+          <div className="sticky left-0 z-10 border-r border-b border-stone-300 bg-[#f3e4d4] px-3 py-2">
             <p className="text-sm font-medium text-[#9a3412]">Unscheduled</p>
             <p className="font-mono text-[10px] text-stone-500">
               Effort with nobody assigned
@@ -183,7 +174,6 @@ export function ProjectGrid({
                 assignments={[]}
                 sprints={sprints}
                 timeline={timelines.find((t) => t.phaseId === phase.id)}
-                currentSprintId={currentSprintId}
                 highlightProjectId={highlightProjectId}
                 selected={selected}
                 onSelect={onSelect}
@@ -198,10 +188,11 @@ export function ProjectGrid({
   );
 }
 
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
 function formatShortDate(iso: string) {
-  const [, , day] = iso.split("-");
-  const monthName = new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-AU", { month: "short", timeZone: "UTC" });
-  return `${day} ${monthName}`;
+  const [, month, day] = iso.split("-");
+  return `${day} ${SHORT_MONTHS[Number(month) - 1]}`;
 }
 
 function PhaseRow({
@@ -211,7 +202,6 @@ function PhaseRow({
   assignments,
   sprints,
   timeline,
-  currentSprintId,
   highlightProjectId,
   selected,
   onSelect,
@@ -224,7 +214,6 @@ function PhaseRow({
   assignments: Assignment[];
   sprints: Sprint[];
   timeline?: PhaseTimeline;
-  currentSprintId: string | null;
   highlightProjectId: string | null;
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
@@ -271,10 +260,7 @@ function PhaseRow({
         return (
           <div
             key={sprint.id}
-            className={cn(
-              "relative h-full border-b border-l border-stone-300",
-              sprint.id === currentSprintId && "bg-transparent",
-            )}
+            className="relative h-full border-b border-l border-stone-300"
             style={{ gridColumn: idx + 2, gridRow: 1 }}
           >
           </div>

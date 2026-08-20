@@ -3,13 +3,20 @@
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+} from "@/components/ui/combobox";
+import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -167,6 +174,7 @@ export function Board({ intent, result, savedViews }: { intent: ScheduleIntent; 
           />
           <FilterMenu
             label={projectFilter.length ? `${projectFilter.length} projects` : "Projects"}
+            searchPlaceholder="Search projects…"
             items={intent.projects.map((p) => ({
               id: p.id,
               name: p.name,
@@ -175,6 +183,7 @@ export function Board({ intent, result, savedViews }: { intent: ScheduleIntent; 
             }))}
             selected={projectFilter}
             onChange={setProjectFilter}
+            searchable
           />
           <FilterMenu
             label={
@@ -182,9 +191,11 @@ export function Board({ intent, result, savedViews }: { intent: ScheduleIntent; 
                 ? `${engineerFilter.length} ${engineerFilter.length === 1 ? "person" : "people"}`
                 : "People"
             }
+            searchPlaceholder="Search people…"
             items={intent.engineers.map((e) => ({ id: e.id, name: e.name }))}
             selected={engineerFilter}
             onChange={setEngineerFilter}
+            searchable
           />
           <FilterMenu
             label={
@@ -208,6 +219,8 @@ export function Board({ intent, result, savedViews }: { intent: ScheduleIntent; 
             selected={highlightProjectId ? [highlightProjectId] : [""]}
             onChange={(ids) => setHighlightProjectId(ids.find((id) => id) || null)}
             single
+            searchable
+            searchPlaceholder="Search projects…"
             swatch={
               highlightProjectId
                 ? projectInk(intent.projects.find((project) => project.id === highlightProjectId)?.color ?? projectIndex.get(highlightProjectId) ?? 0).fill
@@ -309,7 +322,6 @@ export function Board({ intent, result, savedViews }: { intent: ScheduleIntent; 
               assignments={intent.assignments}
               sprints={visibleSprints}
               timelines={result.phaseTimelines}
-              currentSprintId={result.currentSprintId}
               highlightProjectId={highlightProjectId}
               selected={selected}
               onSelect={setSelected}
@@ -399,72 +411,124 @@ function Segmented({
 
 function FilterMenu({
   label,
+  searchPlaceholder,
   items,
   selected,
   onChange,
   single,
   swatch,
+  searchable,
 }: {
   label: string;
+  searchPlaceholder?: string;
   items: { id: string; name: string; code?: string; swatch?: string }[];
   selected: string[];
   onChange: (ids: string[]) => void;
   single?: boolean;
   swatch?: string;
+  searchable?: boolean;
 }) {
   const clearable = !single && selected.length > 0;
+  const selectedItems = items.filter((item) => selected.includes(item.id));
 
   return (
     <div className="flex">
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "gap-1",
-            clearable && "rounded-r-none",
-          )}
+      {searchable && single ? (
+        <Combobox
+          items={items}
+          value={selectedItems[0] ?? null}
+          onValueChange={(nextItem) => onChange(nextItem?.id ? [nextItem.id] : [])}
+          itemToStringLabel={(item) => `${item.name} ${item.code ?? ""}`}
         >
-          {swatch && (
-            <span className="size-2.5 rounded-sm" style={{ background: swatch }} />
-          )}
-          {label}
-          <ChevronDownIcon className="size-3.5" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-52">
-          {single ? (
-            <DropdownMenuRadioGroup
-              value={selected[0] ?? ""}
-              onValueChange={(value) => onChange(value ? [value] : [])}
-            >
-              <DropdownMenuLabel>Highlight</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {items.map((item) => (
-                <DropdownMenuRadioItem key={item.id || "none"} value={item.id}>
+          <ComboboxTrigger render={<Button variant="outline" size="sm" />} className="gap-1">
+            {swatch && <span className="size-2.5 rounded-sm" style={{ background: swatch }} />}
+            {label}
+          </ComboboxTrigger>
+          <ComboboxContent align="end" sideOffset={4} className="w-64">
+            <ComboboxInput
+              autoFocus
+              showTrigger={false}
+              showSearchIcon
+              placeholder={searchPlaceholder ?? "Search…"}
+            />
+            <ComboboxEmpty>No matches found.</ComboboxEmpty>
+            <ComboboxList>
+              {(item) => (
+                <ComboboxItem key={item.id || "none"} value={item}>
                   <FilterItemLabel item={item} />
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          ) : (
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Filter</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {items.map((item) => (
-                <DropdownMenuCheckboxItem
-                  key={item.id || "none"}
-                  checked={selected.includes(item.id)}
-                  onCheckedChange={(checked) => {
-                    onChange(
-                      checked ? [...selected, item.id] : selected.filter((id) => id !== item.id),
-                    );
-                  }}
-                >
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
+      ) : searchable ? (
+        <Combobox
+          items={items}
+          multiple
+          value={selectedItems}
+          onValueChange={(nextItems) => onChange(nextItems.map((item) => item.id))}
+          itemToStringLabel={(item) => `${item.name} ${item.code ?? ""}`}
+        >
+          <ComboboxTrigger
+            render={<Button variant="outline" size="sm" />}
+            className={cn("gap-1", clearable && "rounded-r-none")}
+          >
+            {swatch && <span className="size-2.5 rounded-sm" style={{ background: swatch }} />}
+            {label}
+          </ComboboxTrigger>
+          <ComboboxContent align="end" sideOffset={4} className="w-64">
+            <ComboboxInput
+              autoFocus
+              showTrigger={false}
+              showSearchIcon
+              placeholder={searchPlaceholder ?? "Search…"}
+            />
+            <ComboboxEmpty>No matches found.</ComboboxEmpty>
+            <ComboboxList>
+              {(item) => (
+                <ComboboxItem key={item.id} value={item}>
                   <FilterItemLabel item={item} />
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuGroup>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "gap-1",
+              clearable && "rounded-r-none",
+            )}
+          >
+            {swatch && (
+              <span className="size-2.5 rounded-sm" style={{ background: swatch }} />
+            )}
+            {label}
+            <ChevronDownIcon className="size-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-52">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Filter</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {items.map((item) => (
+              <DropdownMenuCheckboxItem
+                key={item.id || "none"}
+                checked={selected.includes(item.id)}
+                onCheckedChange={(checked) => {
+                  onChange(
+                    checked ? [...selected, item.id] : selected.filter((id) => id !== item.id),
+                  );
+                }}
+              >
+                <FilterItemLabel item={item} />
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       {clearable && (
         <Button
           variant="outline"
@@ -487,7 +551,7 @@ function FilterItemLabel({
   item: { name: string; code?: string; swatch?: string };
 }) {
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex min-w-0 items-center gap-1.5">
       {item.swatch && (
         <span className="size-2.5 shrink-0 rounded-sm" style={{ background: item.swatch }} />
       )}
@@ -496,7 +560,7 @@ function FilterItemLabel({
           {item.code}
         </span>
       )}
-      {item.name}
+      <span className="truncate">{item.name}</span>
     </span>
   );
 }

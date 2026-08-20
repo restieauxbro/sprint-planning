@@ -55,15 +55,15 @@ export function TeamGrid({
         gridTemplateColumns: `112px repeat(${sprints.length}, minmax(112px, 1fr))`,
       }}
     >
-      <div className="sticky top-0 left-0 z-30 border-b border-stone-300 bg-[#efeae0]" />
-      {sprints.map((sprint) => {
+      <div className="sticky top-0 left-0 z-30 border-r border-b border-stone-300 bg-[#efeae0]" />
+      {sprints.map((sprint, sprintIndex) => {
         const current = sprint.id === currentSprintId;
         return (
           <div
             key={sprint.id}
             className={cn(
               "sticky top-0 z-20 border-b border-l border-stone-300 bg-[#efeae0] px-2 py-2",
-              current && "bg-stone-100",
+              sprintIndex === 0 && "border-l-0",
             )}
           >
             <p className="font-mono text-[11px] tracking-wide text-stone-600">
@@ -84,7 +84,7 @@ export function TeamGrid({
       {(sections.length ? groupedPeople : [{ section: null, people: engineers }]).flatMap(({ section, people }) => [
         section ? (
           <div key={`${section.id}-divider`} style={{ gridColumn: "1 / -1" }} className="flex h-14 items-center border-b border-stone-400 bg-[#f4f0e6]">
-            <div className="sticky left-0 z-10 flex w-fit min-w-[112px] items-center gap-2 bg-[#f4f0e6] px-3 py-2">
+            <div className="sticky left-0 z-10 flex w-fit min-w-[112px] items-center gap-2 border-r border-stone-300 bg-[#f4f0e6] px-3 py-2">
               <span className="text-sm font-medium text-stone-800">{section.name}</span>
               <span className="font-mono text-[10px] text-stone-500">{people.length}</span>
             </div>
@@ -100,7 +100,6 @@ export function TeamGrid({
             phases={phases}
             segments={segments.filter((s) => s.engineerId === engineer.id)}
             loads={loads.filter((l) => l.engineerId === engineer.id)}
-            currentSprintId={currentSprintId}
             highlightProjectId={highlightProjectId}
             selected={selected}
             onSelect={onSelect}
@@ -122,7 +121,6 @@ function EngineerRow({
   phases,
   segments,
   loads,
-  currentSprintId,
   highlightProjectId,
   selected,
   onSelect,
@@ -137,7 +135,6 @@ function EngineerRow({
   phases: Phase[];
   segments: CellSegment[];
   loads: EngineerSprintLoad[];
-  currentSprintId: string | null;
   highlightProjectId: string | null;
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
@@ -151,12 +148,12 @@ function EngineerRow({
         type="button"
         title={engineer.name}
         onClick={() => onToggleEngineer(engineer.id)}
-        className="sticky left-0 z-10 border-b border-stone-300 bg-[#f4f0e6] px-3 py-2 text-left whitespace-nowrap hover:bg-[#ebe4d4]"
+        className="sticky left-0 z-10 border-r border-b border-stone-300 bg-[#f4f0e6] px-3 py-2 text-left whitespace-nowrap hover:bg-[#ebe4d4]"
       >
         <p className="text-sm font-medium text-stone-900">{label}</p>
         <p className="font-mono text-[10px] text-stone-500">{engineer.fte.toFixed(1)} FTE</p>
       </button>
-      {sprints.map((sprint) => {
+      {sprints.map((sprint, sprintIndex) => {
         const load = loads.find((l) => l.sprintId === sprint.id);
         const cellSegs = segments.filter((s) => s.sprintId === sprint.id);
         return (
@@ -168,12 +165,12 @@ function EngineerRow({
             segments={cellSegs}
             projects={projects}
             phases={phases}
-            current={sprint.id === currentSprintId}
             highlightProjectId={highlightProjectId}
             selected={selected}
             onSelect={onSelect}
             projectIndex={projectIndex}
             showProjectName={showProjectName}
+            firstSprint={sprintIndex === 0}
           />
         );
       })}
@@ -188,12 +185,12 @@ function CapacityCell({
   segments,
   projects,
   phases,
-  current,
   highlightProjectId,
   selected,
   onSelect,
   projectIndex,
   showProjectName,
+  firstSprint,
 }: {
   sprint: Sprint;
   engineer: Engineer;
@@ -201,12 +198,12 @@ function CapacityCell({
   segments: CellSegment[];
   projects: Project[];
   phases: Phase[];
-  current: boolean;
   highlightProjectId: string | null;
   selected: Selection | null;
   onSelect: (selection: Selection) => void;
   projectIndex: Map<string, number>;
   showProjectName: boolean;
+  firstSprint: boolean;
 }) {
   const working = sprint.workingDays;
   const ptoPct = ((load?.timeOffDays ?? 0) / working) * 100;
@@ -234,8 +231,8 @@ function CapacityCell({
     <div
       className={cn(
         "relative flex border-b border-l border-stone-300",
+        firstSprint && "border-l-0",
         stacked ? "min-h-[4.5rem] flex-col" : "h-14",
-        current && "bg-[#e8d7a8]/20",
       )}
     >
       <div className={cn("flex min-h-0 flex-1", stacked ? "flex-col" : "flex-row")}>
@@ -406,8 +403,9 @@ function SegmentButton({
   );
 }
 
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
 function formatShortDate(iso: string) {
-  const [, , d] = iso.split("-");
-  const monthName = new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-AU", { month: "short", timeZone: "UTC" });
-  return `${d} ${monthName}`;
+  const [, month, day] = iso.split("-");
+  return `${day} ${SHORT_MONTHS[Number(month) - 1]}`;
 }
