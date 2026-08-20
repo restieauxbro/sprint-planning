@@ -4,6 +4,8 @@ A local sprint board for engineering and project managers. Keep the plan in SQLi
 
 The app is a view, not a Gantt editor. You or the agent change rows in `data/planner.sqlite`; the timeline lays out from today forward and reloads when the file changes.
 
+Planner behaviour and product decisions are documented in [`docs/`](docs/README.md), including [scheduling and queuing](docs/scheduling-and-queuing.md).
+
 ## Run
 
 ```bash
