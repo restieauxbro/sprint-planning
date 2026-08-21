@@ -4,6 +4,7 @@ import {
   createSavedView,
   deleteSavedView,
   setDefaultSavedView,
+  updatePhaseEffort,
   updateSavedView,
 } from "@/lib/db";
 import { parseViewConfig, type BoardViewConfig } from "@/lib/saved-views";
@@ -43,4 +44,10 @@ export async function deleteViewAction(id: string) {
   const result = deleteSavedView(id);
   if (result.ok) refreshBoard();
   return result;
+}
+
+export async function updatePhaseEffortAction(id: string, effortDays: number) {
+  const result = updatePhaseEffort(id, effortDays);
+  if (result.ok) refreshBoard();
+  return result.ok ? { error: null } : { error: result.error };
 }

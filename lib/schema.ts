@@ -36,8 +36,28 @@ export const phases = sqliteTable("phases", {
   kind: text("kind"),
   sortOrder: integer("sort_order").notNull().default(0),
   effortDays: real("effort_days").notNull(),
-  parallelOk: integer("parallel_ok").notNull().default(0),
+  startSprintId: text("start_sprint_id").references(() => sprints.id),
 });
+
+export const phaseDependencies = sqliteTable(
+  "phase_dependencies",
+  {
+    predecessorPhaseId: text("predecessor_phase_id")
+      .notNull()
+      .references(() => phases.id, { onDelete: "cascade" }),
+    successorPhaseId: text("successor_phase_id")
+      .notNull()
+      .references(() => phases.id, { onDelete: "cascade" }),
+    dependencyType: text("dependency_type", {
+      enum: ["finish_to_start", "start_together"],
+    }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.predecessorPhaseId, table.successorPhaseId, table.dependencyType],
+    }),
+  ],
+);
 
 export const assignments = sqliteTable(
   "assignments",
@@ -83,7 +103,10 @@ export type Project = Omit<typeof projects.$inferSelect, "color" | "tags"> & {
   color?: string | null;
   tags?: string | null;
 };
-export type Phase = typeof phases.$inferSelect;
+export type Phase = Omit<typeof phases.$inferSelect, "startSprintId"> & {
+  startSprintId?: string | null;
+};
+export type PhaseDependency = typeof phaseDependencies.$inferSelect;
 export type Assignment = typeof assignments.$inferSelect;
 export type TimeOff = typeof timeOff.$inferSelect;
 
@@ -92,6 +115,7 @@ export type ScheduleIntent = {
   sprints: Sprint[];
   projects: Project[];
   phases: Phase[];
+  phaseDependencies: PhaseDependency[];
   assignments: Assignment[];
   timeOff: TimeOff[];
 };

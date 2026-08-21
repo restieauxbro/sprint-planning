@@ -1,4 +1,12 @@
-import type { Assignment, Engineer, Phase, Project, ScheduleIntent, Sprint } from "@/lib/schema";
+import type {
+  Assignment,
+  Engineer,
+  Phase,
+  PhaseDependency,
+  Project,
+  ScheduleIntent,
+  Sprint,
+} from "@/lib/schema";
 
 const EPS = 0.001;
 
@@ -35,7 +43,8 @@ export type PhaseTimeline = {
   remainingDays: number;
   unscheduled: boolean;
   delayed: boolean;
-  predecessorId: string | null;
+  predecessorIds: string[];
+  startsTogetherWithIds: string[];
   whyStart: string;
 };
 
@@ -72,12 +81,89 @@ export function findCurrentSprint(sprints: Sprint[], today?: string): Sprint | n
   return future ?? sprints[sprints.length - 1] ?? null;
 }
 
-function predecessorOf(phase: Phase, phases: Phase[]): Phase | null {
-  const siblings = phases
-    .filter((p) => p.projectId === phase.projectId)
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
-  const idx = siblings.findIndex((p) => p.id === phase.id);
-  return idx > 0 ? siblings[idx - 1]! : null;
+type DependencyGraph = {
+  groupByPhase: Map<string, string>;
+  membersByGroup: Map<string, string[]>;
+  finishPredecessorsByGroup: Map<string, string[]>;
+  finishPredecessorsByPhase: Map<string, string[]>;
+  startsTogetherByPhase: Map<string, string[]>;
+};
+
+function buildDependencyGraph(phases: Phase[], dependencies: PhaseDependency[]): DependencyGraph {
+  const phaseIds = new Set(phases.map((phase) => phase.id));
+  const parent = new Map(phases.map((phase) => [phase.id, phase.id]));
+
+  function find(id: string): string {
+    const current = parent.get(id) ?? id;
+    if (current === id) return id;
+    const root = find(current);
+    parent.set(id, root);
+    return root;
+  }
+
+  function union(a: string, b: string) {
+    const aRoot = find(a);
+    const bRoot = find(b);
+    if (aRoot === bRoot) return;
+    const root = aRoot.localeCompare(bRoot) <= 0 ? aRoot : bRoot;
+    parent.set(aRoot, root);
+    parent.set(bRoot, root);
+  }
+
+  for (const dependency of dependencies) {
+    if (
+      dependency.dependencyType === "start_together" &&
+      phaseIds.has(dependency.predecessorPhaseId) &&
+      phaseIds.has(dependency.successorPhaseId)
+    ) {
+      union(dependency.predecessorPhaseId, dependency.successorPhaseId);
+    }
+  }
+
+  const groupByPhase = new Map<string, string>();
+  const membersByGroup = new Map<string, string[]>();
+  for (const phase of phases) {
+    const groupId = find(phase.id);
+    groupByPhase.set(phase.id, groupId);
+    const members = membersByGroup.get(groupId) ?? [];
+    members.push(phase.id);
+    membersByGroup.set(groupId, members);
+  }
+
+  const finishPredecessorsByGroup = new Map<string, string[]>();
+  const finishPredecessorsByPhase = new Map<string, string[]>();
+  const startsTogetherByPhase = new Map<string, string[]>();
+  for (const phase of phases) startsTogetherByPhase.set(phase.id, []);
+
+  for (const dependency of dependencies) {
+    if (!phaseIds.has(dependency.predecessorPhaseId) || !phaseIds.has(dependency.successorPhaseId)) {
+      continue;
+    }
+    if (dependency.dependencyType === "start_together") {
+      startsTogetherByPhase.get(dependency.predecessorPhaseId)?.push(dependency.successorPhaseId);
+      startsTogetherByPhase.get(dependency.successorPhaseId)?.push(dependency.predecessorPhaseId);
+      continue;
+    }
+
+    const successorGroup = groupByPhase.get(dependency.successorPhaseId)!;
+    if (groupByPhase.get(dependency.predecessorPhaseId) === successorGroup) continue;
+    const groupPredecessors = finishPredecessorsByGroup.get(successorGroup) ?? [];
+    if (!groupPredecessors.includes(dependency.predecessorPhaseId)) {
+      groupPredecessors.push(dependency.predecessorPhaseId);
+      finishPredecessorsByGroup.set(successorGroup, groupPredecessors);
+    }
+    const phasePredecessors = finishPredecessorsByPhase.get(dependency.successorPhaseId) ?? [];
+    phasePredecessors.push(dependency.predecessorPhaseId);
+    finishPredecessorsByPhase.set(dependency.successorPhaseId, phasePredecessors);
+  }
+
+  return {
+    groupByPhase,
+    membersByGroup,
+    finishPredecessorsByGroup,
+    finishPredecessorsByPhase,
+    startsTogetherByPhase,
+  };
 }
 
 function projectById(projects: Project[], id: string) {
@@ -88,15 +174,29 @@ function engineerById(engineers: Engineer[], id: string) {
   return engineers.find((e) => e.id === id);
 }
 
-function isEligible(
+function isGroupReady(
+  groupId: string,
+  graph: DependencyGraph,
+  phaseById: Map<string, Phase>,
+  startedGroups: Set<string>,
   phase: Phase,
   remaining: Map<string, number>,
-  pred: Phase | null,
+  sprintIndex: number,
+  sprintIndexById: Map<string, number>,
 ): boolean {
-  if ((remaining.get(phase.id) ?? 0) <= EPS) return false;
-  if (!pred) return true;
-  if (phase.parallelOk) return true;
-  return (remaining.get(pred.id) ?? 0) <= EPS;
+  if (startedGroups.has(groupId)) return true;
+  const members = graph.membersByGroup.get(groupId) ?? [phase.id];
+  const plannedStartsMet = members.every((phaseId) => {
+    const member = phaseById.get(phaseId);
+    const plannedStartIndex = member?.startSprintId
+      ? sprintIndexById.get(member.startSprintId)
+      : undefined;
+    return plannedStartIndex == null || sprintIndex >= plannedStartIndex;
+  });
+  if (!plannedStartsMet) return false;
+  return (graph.finishPredecessorsByGroup.get(groupId) ?? []).every(
+    (predecessorId) => (remaining.get(predecessorId) ?? 0) <= EPS,
+  );
 }
 
 function byPriority(
@@ -153,20 +253,21 @@ export function schedule(intent: ScheduleIntent, today?: string): ScheduleResult
   const engineers = [...intent.engineers].sort((a, b) => a.sortOrder - b.sortOrder);
   const phases = [...intent.phases];
   const projects = intent.projects;
+  const dependencies = intent.phaseDependencies;
   const assignments = intent.assignments;
   const timeOff = intent.timeOff;
+  const phaseById = new Map(phases.map((phase) => [phase.id, phase]));
+  const graph = buildDependencyGraph(phases, dependencies);
 
   const current = findCurrentSprint(sprints, today);
   const planningStartIndex = current
     ? Math.max(0, sprints.findIndex((s) => s.id === current.id))
     : 0;
   const horizon = sprints.slice(planningStartIndex);
+  const sprintIndexById = new Map(sprints.map((sprint, index) => [sprint.id, index]));
 
   const remaining = new Map<string, number>();
   for (const phase of phases) remaining.set(phase.id, phase.effortDays);
-
-  const predByPhase = new Map<string, Phase | null>();
-  for (const phase of phases) predByPhase.set(phase.id, predecessorOf(phase, phases));
 
   const assignmentsByEngineer = new Map<string, Assignment[]>();
   for (const row of assignments) {
@@ -179,72 +280,151 @@ export function schedule(intent: ScheduleIntent, today?: string): ScheduleResult
   const loads: EngineerSprintLoad[] = [];
   const firstDelivery = new Map<string, string>();
   const lastDelivery = new Map<string, string>();
+  const startedGroups = new Set<string>();
 
-  for (const sprint of horizon) {
-    const eligible = new Set(
-      phases
-        .filter((phase) => isEligible(phase, remaining, predByPhase.get(phase.id) ?? null))
-        .map((p) => p.id),
+  type Intended = {
+    engineerId: string;
+    phaseId: string;
+    projectId: string;
+    days: number;
+    allocatedFraction: number;
+    requestedFraction: number;
+  };
+
+  for (const [horizonIndex, sprint] of horizon.entries()) {
+    const sprintIndex = planningStartIndex + horizonIndex;
+    const readyStartingGroups = new Set(
+      phases.flatMap((phase) => {
+        const groupId = graph.groupByPhase.get(phase.id)!;
+        return !startedGroups.has(groupId) &&
+          isGroupReady(
+            groupId,
+            graph,
+            phaseById,
+            startedGroups,
+            phase,
+            remaining,
+            sprintIndex,
+            sprintIndexById,
+          )
+          ? [groupId]
+          : [];
+      }),
     );
 
-    type Intended = {
-      engineerId: string;
-      phaseId: string;
-      projectId: string;
-      days: number;
-      allocatedFraction: number;
-      requestedFraction: number;
-    };
-    const intended: Intended[] = [];
-
-    for (const engineer of engineers) {
-      const leave = timeOff.find(
-        (t) => t.engineerId === engineer.id && t.sprintId === sprint.id,
+    function allocateSprint(excludedStartingGroups: Set<string>) {
+      const eligible = new Set(
+        phases.flatMap((phase) => {
+          if ((remaining.get(phase.id) ?? 0) <= EPS) return [];
+          const groupId = graph.groupByPhase.get(phase.id)!;
+          if (excludedStartingGroups.has(groupId)) return [];
+          return isGroupReady(
+            groupId,
+            graph,
+            phaseById,
+            startedGroups,
+            phase,
+            remaining,
+            sprintIndex,
+            sprintIndexById,
+          )
+            ? [phase.id]
+            : [];
+        }),
       );
-      const daysOff = leave?.daysOff ?? 0;
-      const capacityDays = Math.max(0, engineer.fte * sprint.workingDays - daysOff);
-      const eligibleRows = (assignmentsByEngineer.get(engineer.id) ?? []).filter((a) =>
-        eligible.has(a.phaseId),
-      );
-      const fractionItems = eligibleRows.map((row) => {
-        const phase = phases.find((p) => p.id === row.phaseId)!;
-        const project = projectById(projects, phase.projectId)!;
-        return {
-          phaseId: row.phaseId,
-          fraction: row.fraction,
-          priority: project.priority,
-          sortOrder: phase.sortOrder,
-        };
-      });
-      const filled = waterfillEngineer(fractionItems, capacityDays, remaining);
-      const demand = effectiveDemand(fractionItems, capacityDays, remaining);
-      const allocatedSum = filled.reduce((sum, row) => sum + row.allocated, 0);
+      const intended: Intended[] = [];
+      const sprintLoads: EngineerSprintLoad[] = [];
 
-      for (const row of filled) {
-        if (row.requested <= EPS) continue;
-        const phase = phases.find((p) => p.id === row.phaseId)!;
-        intended.push({
+      for (const engineer of engineers) {
+        const leave = timeOff.find(
+          (timeOffRow) =>
+            timeOffRow.engineerId === engineer.id && timeOffRow.sprintId === sprint.id,
+        );
+        const daysOff = leave?.daysOff ?? 0;
+        const capacityDays = Math.max(0, engineer.fte * sprint.workingDays - daysOff);
+        const eligibleRows = (assignmentsByEngineer.get(engineer.id) ?? []).filter((assignment) =>
+          eligible.has(assignment.phaseId),
+        );
+        const fractionItems = eligibleRows.map((row) => {
+          const phase = phaseById.get(row.phaseId)!;
+          const project = projectById(projects, phase.projectId)!;
+          return {
+            phaseId: row.phaseId,
+            fraction: row.fraction,
+            priority: project.priority,
+            sortOrder: phase.sortOrder,
+          };
+        });
+        const filled = waterfillEngineer(fractionItems, capacityDays, remaining);
+        const demand = effectiveDemand(fractionItems, capacityDays, remaining);
+        const allocatedSum = filled.reduce((sum, row) => sum + row.allocated, 0);
+
+        for (const row of filled) {
+          if (row.requested <= EPS) continue;
+          const phase = phaseById.get(row.phaseId)!;
+          intended.push({
+            engineerId: engineer.id,
+            phaseId: row.phaseId,
+            projectId: phase.projectId,
+            days: row.days,
+            allocatedFraction: row.allocated,
+            requestedFraction: row.requested,
+          });
+        }
+
+        sprintLoads.push({
+          sprintId: sprint.id,
           engineerId: engineer.id,
-          phaseId: row.phaseId,
-          projectId: phase.projectId,
-          days: row.days,
-          allocatedFraction: row.allocated,
-          requestedFraction: row.requested,
+          capacityDays,
+          timeOffDays: daysOff,
+          timeOffPlacement: leave?.placement === "end" ? "end" : "start",
+          deliveredDays: 0,
+          idleDays: capacityDays,
+          requestedFractionSum: demand,
+          allocatedFractionSum: allocatedSum,
+          overloaded: demand > 1 + EPS,
         });
       }
 
-      loads.push({
-        sprintId: sprint.id,
-        engineerId: engineer.id,
-        capacityDays,
-        timeOffDays: daysOff,
-        timeOffPlacement: leave?.placement === "end" ? "end" : "start",
-        deliveredDays: 0,
-        idleDays: capacityDays,
-        requestedFractionSum: demand,
-        allocatedFractionSum: allocatedSum,
-        overloaded: demand > 1 + EPS,
+      return { intended, sprintLoads };
+    }
+
+    const excludedStartingGroups = new Set<string>();
+    let allocation = allocateSprint(excludedStartingGroups);
+    while (true) {
+      const newlyBlocked = Array.from(readyStartingGroups).filter((groupId) => {
+        if (excludedStartingGroups.has(groupId)) return false;
+        const activeMembers = (graph.membersByGroup.get(groupId) ?? []).filter(
+          (phaseId) => (remaining.get(phaseId) ?? 0) > EPS,
+        );
+        if (activeMembers.length <= 1) return false;
+        return activeMembers.some(
+          (phaseId) =>
+            allocation.intended
+              .filter((row) => row.phaseId === phaseId)
+              .reduce((sum, row) => sum + row.days, 0) <= EPS,
+        );
       });
+      if (!newlyBlocked.length) break;
+      for (const groupId of newlyBlocked) excludedStartingGroups.add(groupId);
+      allocation = allocateSprint(excludedStartingGroups);
+    }
+
+    const { intended, sprintLoads } = allocation;
+    loads.push(...sprintLoads);
+
+    for (const groupId of readyStartingGroups) {
+      if (excludedStartingGroups.has(groupId)) continue;
+      const activeMembers = (graph.membersByGroup.get(groupId) ?? []).filter(
+        (phaseId) => (remaining.get(phaseId) ?? 0) > EPS,
+      );
+      const allStarting = activeMembers.every(
+        (phaseId) =>
+          intended
+            .filter((row) => row.phaseId === phaseId)
+            .reduce((sum, row) => sum + row.days, 0) > EPS,
+      );
+      if (activeMembers.length > 0 && allStarting) startedGroups.add(groupId);
     }
 
     const byPhase = new Map<string, Intended[]>();
@@ -298,7 +478,19 @@ export function schedule(intent: ScheduleIntent, today?: string): ScheduleResult
   const planningStartSprintId = horizon[0]?.id ?? null;
 
   const phaseTimelines: PhaseTimeline[] = phases.map((phase) => {
-    const pred = predByPhase.get(phase.id) ?? null;
+    const groupId = graph.groupByPhase.get(phase.id)!;
+    const predecessorIds = graph.finishPredecessorsByGroup.get(groupId) ?? [];
+    const predecessors = predecessorIds.flatMap((id) => {
+      const predecessor = phaseById.get(id);
+      return predecessor ? [predecessor] : [];
+    });
+    const startsTogetherWithIds = (graph.membersByGroup.get(groupId) ?? []).filter(
+      (id) => id !== phase.id,
+    );
+    const startsTogetherWith = startsTogetherWithIds.flatMap((id) => {
+      const member = phaseById.get(id);
+      return member ? [member] : [];
+    });
     const assigned = assignments.some((a) => a.phaseId === phase.id);
     const unscheduled = !assigned && phase.effortDays > EPS;
     const startSprintId = firstDelivery.get(phase.id) ?? null;
@@ -306,20 +498,32 @@ export function schedule(intent: ScheduleIntent, today?: string): ScheduleResult
     const remainingDays = remaining.get(phase.id) ?? 0;
 
     let expectedIndex = 0;
-    if (pred) {
-      const predEnd = lastDelivery.get(pred.id);
-      expectedIndex = predEnd != null ? (sprintIndex.get(predEnd) ?? 0) + 1 : 0;
+    for (const predecessor of predecessors) {
+      const predecessorEnd = lastDelivery.get(predecessor.id);
+      if (predecessorEnd != null) {
+        expectedIndex = Math.max(expectedIndex, (sprintIndex.get(predecessorEnd) ?? 0) + 1);
+      }
+    }
+    for (const memberId of graph.membersByGroup.get(groupId) ?? [phase.id]) {
+      const plannedStartSprintId = phaseById.get(memberId)?.startSprintId;
+      const plannedStartIndex = plannedStartSprintId
+        ? sprintIndex.get(plannedStartSprintId)
+        : undefined;
+      if (plannedStartIndex != null) expectedIndex = Math.max(expectedIndex, plannedStartIndex);
     }
     const actualIndex = startSprintId != null ? (sprintIndex.get(startSprintId) ?? 0) : null;
     const delayed =
       assigned &&
       (actualIndex == null || actualIndex > expectedIndex + EPS) &&
       !unscheduled &&
-      (pred != null || (actualIndex != null && actualIndex > 0));
+      (predecessors.length > 0 ||
+        startsTogetherWith.length > 0 ||
+        (actualIndex != null && actualIndex > 0));
 
     const whyStart = explainStart({
       phase,
-      pred,
+      predecessors,
+      startsTogetherWith,
       assigned,
       unscheduled,
       startSprintId,
@@ -340,7 +544,8 @@ export function schedule(intent: ScheduleIntent, today?: string): ScheduleResult
       remainingDays,
       unscheduled,
       delayed: Boolean(delayed && assigned && !unscheduled),
-      predecessorId: pred?.id ?? null,
+      predecessorIds,
+      startsTogetherWithIds,
       whyStart,
     };
   });
@@ -367,7 +572,8 @@ export function schedule(intent: ScheduleIntent, today?: string): ScheduleResult
 
 function explainStart(args: {
   phase: Phase;
-  pred: Phase | null;
+  predecessors: Phase[];
+  startsTogetherWith: Phase[];
   assigned: boolean;
   unscheduled: boolean;
   startSprintId: string | null;
@@ -381,7 +587,8 @@ function explainStart(args: {
 }) {
   const {
     phase,
-    pred,
+    predecessors,
+    startsTogetherWith,
     assigned,
     unscheduled,
     startSprintId,
@@ -398,15 +605,30 @@ function explainStart(args: {
 
   const start = horizon.find((s) => s.id === startSprintId);
   const expected = horizon[expectedIndex];
+  const predecessorNames = predecessors.map((predecessor) => predecessor.name).join(", ");
+  const groupNames = startsTogetherWith.map((member) => member.name).join(", ");
 
   if (!start) {
-    return pred
-      ? `Assigned, but never starts in this horizon. Waiting on ${pred.name} or higher-priority work.`
+    if (groupNames) {
+      return `Assigned, but its start group never starts in this horizon. Waiting on ${groupNames}, dependencies, or capacity.`;
+    }
+    return predecessorNames
+      ? `Assigned, but never starts in this horizon. Waiting on ${predecessorNames} or higher-priority work.`
       : "Assigned, but never starts in this horizon (capacity went to higher-priority work).";
   }
 
-  if (pred && !delayed) {
-    return `Starts after ${pred.name} (${expected?.name ?? "previous sprint"}).`;
+  if (groupNames && !delayed) {
+    return predecessorNames
+      ? `Starts with ${groupNames} after ${predecessorNames} (${start.name}).`
+      : `Starts with ${groupNames} in ${start.name}.`;
+  }
+
+  if (phase.startSprintId && !delayed) {
+    return `Scheduled for ${start.name}.`;
+  }
+
+  if (predecessorNames && !delayed) {
+    return `Starts after ${predecessorNames} (${expected?.name ?? "previous sprint"}).`;
   }
 
   if (delayed) {

@@ -3,6 +3,7 @@
 
 DELETE FROM time_off;
 DELETE FROM assignments;
+DELETE FROM phase_dependencies;
 DELETE FROM phases;
 DELETE FROM projects;
 DELETE FROM sprints;
@@ -38,17 +39,30 @@ INSERT INTO projects (id, name, code, color, priority, sort_order) VALUES
   ('proj_payments', 'Payments', 'Pay', 'brass', 2, 2),
   ('proj_atlas', 'Atlas mobile', 'Atl', 'olive', 3, 3);
 
-INSERT INTO phases (id, project_id, name, kind, sort_order, effort_days, parallel_ok) VALUES
-  ('phase_checkout_disc', 'proj_checkout', 'Discovery', 'discovery', 1, 5, 0),
-  ('phase_checkout_sol', 'proj_checkout', 'Solution', 'solution', 2, 10, 0),
-  ('phase_checkout_be', 'proj_checkout', 'Backend', 'backend', 3, 30, 0),
-  ('phase_checkout_fe', 'proj_checkout', 'Frontend', 'frontend', 4, 20, 0),
-  ('phase_payments_disc', 'proj_payments', 'Discovery', 'discovery', 1, 10, 0),
-  ('phase_payments_sol', 'proj_payments', 'Solution', 'solution', 2, 10, 0),
-  ('phase_atlas_disc', 'proj_atlas', 'Discovery', 'discovery', 1, 10, 0),
-  ('phase_atlas_sol', 'proj_atlas', 'Solution', 'solution', 2, 10, 0),
-  ('phase_atlas_be', 'proj_atlas', 'Backend', 'backend', 3, 20, 0),
-  ('phase_atlas_fe', 'proj_atlas', 'Frontend', 'frontend', 4, 15, 0);
+INSERT INTO phases (id, project_id, name, kind, sort_order, effort_days) VALUES
+  ('phase_checkout_disc', 'proj_checkout', 'Discovery', 'discovery', 1, 5),
+  ('phase_checkout_sol', 'proj_checkout', 'Solution', 'solution', 2, 10),
+  ('phase_checkout_be', 'proj_checkout', 'Backend', 'backend', 3, 30),
+  ('phase_checkout_fe', 'proj_checkout', 'Frontend', 'frontend', 4, 20),
+  ('phase_payments_disc', 'proj_payments', 'Discovery', 'discovery', 1, 10),
+  ('phase_payments_sol', 'proj_payments', 'Solution', 'solution', 2, 10),
+  ('phase_atlas_disc', 'proj_atlas', 'Discovery', 'discovery', 1, 10),
+  ('phase_atlas_sol', 'proj_atlas', 'Solution', 'solution', 2, 10),
+  ('phase_atlas_be', 'proj_atlas', 'Backend', 'backend', 3, 20),
+  ('phase_atlas_fe', 'proj_atlas', 'Frontend', 'frontend', 4, 15);
+
+INSERT INTO phase_dependencies (
+  predecessor_phase_id,
+  successor_phase_id,
+  dependency_type
+) VALUES
+  ('phase_checkout_disc', 'phase_checkout_sol', 'finish_to_start'),
+  ('phase_checkout_sol', 'phase_checkout_be', 'finish_to_start'),
+  ('phase_checkout_be', 'phase_checkout_fe', 'finish_to_start'),
+  ('phase_payments_disc', 'phase_payments_sol', 'finish_to_start'),
+  ('phase_atlas_disc', 'phase_atlas_sol', 'finish_to_start'),
+  ('phase_atlas_sol', 'phase_atlas_be', 'finish_to_start'),
+  ('phase_atlas_be', 'phase_atlas_fe', 'finish_to_start');
 
 INSERT INTO assignments (phase_id, engineer_id, fraction) VALUES
   ('phase_checkout_disc', 'eng_maya', 1.0),

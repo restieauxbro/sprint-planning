@@ -30,7 +30,8 @@ Schema: [`data/schema.sql`](data/schema.sql). Units: person-days; 1 week = 5 day
 | `engineers` | People and FTE |
 | `sprints` | Named 2-week buckets with dates |
 | `projects` | Initiatives with a short `code` (`Chk`, or an emoji like `🧠`) and priority (1 wins) |
-| `phases` | Ordered work on a project (`effort_days`, optional `parallel_ok`) |
+| `phases` | Work within a project (`effort_days`; `sort_order` controls display only) |
+| `phase_dependencies` | Explicit finish-to-start and start-together relationships between phases |
 | `assignments` | Who works a phase, at what fraction of capacity |
 | `time_off` | Days out in a given sprint |
 
@@ -48,7 +49,7 @@ Worked SQL examples: [`AGENT.md`](AGENT.md).
 
 ## How the schedule is computed
 
-From the current sprint onward, eligible phases claim capacity in project-priority order. Sequential phases start the sprint after the predecessor finishes. Leftover days in a sprint pour into the next eligible assignment instead of sitting idle. Overload is effective demand over 1.0, not raw fraction sums.
+From the current sprint onward, eligible phases claim capacity in project-priority order. Finish-to-start dependencies release a phase after every predecessor finishes. Start-together groups begin atomically in one sprint, then their members finish independently. Leftover days in a sprint pour into the next eligible assignment instead of sitting idle. Overload is effective demand over 1.0, not raw fraction sums.
 
 The scheduler lives next to the board (`app/cursor/_lib/schedule.ts`), not in shared `lib/`. Shared pieces are the DB (`lib/db.ts`), schema, watch API, and UI kit.
 

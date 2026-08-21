@@ -23,3 +23,21 @@
 **Decision:** Show calculated start and finish sprints in the Projects view, not an effort-only or requested timeline.
 
 **Why:** A project view should communicate the current forecast. The Team view provides the supporting sprint-by-sprint explanation, including queued and idle capacity.
+
+## 2026-08-21 — Phase dependencies are explicit
+
+**Decision:** Replace implicit row-order sequencing and `parallel_ok` with explicit `finish_to_start` and `start_together` relationships. Treat display order as presentation only.
+
+**Why:** Generic overlap cannot express phases that must move and begin together, finish independently, and release separate downstream branches. Explicit relationships make those constraints durable and allow a phase to have multiple predecessors or successors.
+
+## 2026-08-21 — Start-together groups begin atomically
+
+**Decision:** Do not start any active member of a start-together group until every active member can receive work in the same sprint. After that first sprint, schedule each member independently.
+
+**Why:** Merely making phases eligible together does not guarantee that capacity contention will let them actually begin together. Atomic first delivery preserves the planning constraint without coupling their finish dates.
+
+## 2026-08-21 — No compatibility layer for `parallel_ok`
+
+**Decision:** Remove `parallel_ok` from the phase schema and migrate existing plan intent into dependency records without retaining legacy scheduling behaviour.
+
+**Why:** Maintaining both models would make phase ordering ambiguous. One dependency graph gives the scheduler, database editors, inspector, and documentation a single source of truth.

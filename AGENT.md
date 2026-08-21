@@ -18,7 +18,8 @@ Schema: [`data/schema.sql`](data/schema.sql). Reset seed: `npm run db:init`.
 | `engineers` | People. `id` is a slug (`eng_maya`). `title` is shown on the Team page (Engineer, BA, …). |
 | `sprints` | Named 2-week buckets. Dates are `YYYY-MM-DD`. |
 | `projects` | Initiatives. `code` is a short label on bars (`Chk`, or an emoji like `🧠`). Lower `priority` number claims capacity first. |
-| `phases` | Ordered work on a project. `parallel_ok=1` can overlap the previous phase. |
+| `phases` | Work on a project. `sort_order` controls display, not scheduling. |
+| `phase_dependencies` | `finish_to_start` and `start_together` relationships between phases. |
 | `assignments` | Who works a phase, at what fraction. Not a cell per sprint. |
 | `time_off` | Days out in a given sprint. Shrinks that person’s capacity. |
 
@@ -46,8 +47,8 @@ Payments discovery on Maya at 50% while she is 100% on Checkout (priority 1):
 INSERT INTO projects (id, name, code, priority, sort_order)
 VALUES ('proj_payments', 'Payments', 'Pay', 2, 2);
 
-INSERT INTO phases (id, project_id, name, kind, sort_order, effort_days, parallel_ok)
-VALUES ('phase_payments_disc', 'proj_payments', 'Discovery', 'discovery', 1, 10, 0);
+INSERT INTO phases (id, project_id, name, kind, sort_order, effort_days)
+VALUES ('phase_payments_disc', 'proj_payments', 'Discovery', 'discovery', 1, 10);
 
 INSERT INTO assignments (phase_id, engineer_id, fraction)
 VALUES ('phase_payments_disc', 'eng_maya', 0.5);
@@ -61,6 +62,28 @@ VALUES ('phase_payments_disc', 'eng_priya', 1.0);
 
 DELETE FROM assignments
 WHERE phase_id = 'phase_payments_disc' AND engineer_id = 'eng_maya';
+```
+
+### Add phase dependencies
+
+Build starts after Discovery finishes:
+
+```sql
+INSERT INTO phase_dependencies (
+  predecessor_phase_id, successor_phase_id, dependency_type
+) VALUES (
+  'phase_checkout_disc', 'phase_checkout_be', 'finish_to_start'
+);
+```
+
+Build and Data Build must begin in the same sprint but can finish independently:
+
+```sql
+INSERT INTO phase_dependencies (
+  predecessor_phase_id, successor_phase_id, dependency_type
+) VALUES (
+  'phase_checkout_be', 'phase_checkout_data', 'start_together'
+);
 ```
 
 ## Talking to the app

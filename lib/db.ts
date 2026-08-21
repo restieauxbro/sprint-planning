@@ -6,12 +6,14 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import {
   assignments,
   engineers,
+  phaseDependencies,
   phases,
   projects,
   savedViews,
   sprints,
   timeOff,
   type Engineer,
+  type Phase,
   type Project,
   type ScheduleIntent,
 } from "./schema";
@@ -58,7 +60,16 @@ function getClient(): SqliteHandle {
 
 export function getDb() {
   return drizzle(getClient(), {
-    schema: { engineers, sprints, projects, phases, assignments, timeOff, savedViews },
+    schema: {
+      engineers,
+      sprints,
+      projects,
+      phases,
+      phaseDependencies,
+      assignments,
+      timeOff,
+      savedViews,
+    },
   });
 }
 
@@ -191,6 +202,7 @@ export function loadIntent(): LoadIntentResult {
       sprints: db.select().from(sprints).orderBy(asc(sprints.startDate)).all(),
       projects: db.select().from(projects).orderBy(asc(projects.sortOrder)).all(),
       phases: db.select().from(phases).orderBy(asc(phases.sortOrder)).all(),
+      phaseDependencies: db.select().from(phaseDependencies).all(),
       assignments: db.select().from(assignments).all(),
       timeOff: db.select().from(timeOff).all(),
     };
@@ -205,6 +217,7 @@ export function loadIntent(): LoadIntentResult {
         sprints: db.select().from(sprints).orderBy(asc(sprints.startDate)).all(),
         projects: db.select().from(projects).orderBy(asc(projects.sortOrder)).all(),
         phases: db.select().from(phases).orderBy(asc(phases.sortOrder)).all(),
+        phaseDependencies: db.select().from(phaseDependencies).all(),
         assignments: db.select().from(assignments).all(),
         timeOff: db.select().from(timeOff).all(),
       };
@@ -413,6 +426,33 @@ export function updateProject(id: string, input: ProjectInput): ProjectResult {
     const project = db.select().from(projects).where(eq(projects.id, id)).get();
     if (!project) return { ok: false, error: "Could not read the project back." };
     return { ok: true, project };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export type PhaseEffortResult =
+  | { ok: true; phase: Phase }
+  | { ok: false; error: string };
+
+export function updatePhaseEffort(id: string, effortDays: number): PhaseEffortResult {
+  if (!id) return { ok: false, error: "Missing phase." };
+  if (!Number.isFinite(effortDays) || effortDays <= 0) {
+    return { ok: false, error: "Effort must be greater than 0 days." };
+  }
+  if (!dbFileExists()) {
+    return { ok: false, error: "Database missing. Run npm run db:init." };
+  }
+
+  try {
+    const db = getDb();
+    const existing = db.select().from(phases).where(eq(phases.id, id)).get();
+    if (!existing) return { ok: false, error: "That phase no longer exists." };
+    db.update(phases).set({ effortDays }).where(eq(phases.id, id)).run();
+    const phase = db.select().from(phases).where(eq(phases.id, id)).get();
+    return phase
+      ? { ok: true, phase }
+      : { ok: false, error: "Could not read the phase back." };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

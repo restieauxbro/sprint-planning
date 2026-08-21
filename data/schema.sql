@@ -45,7 +45,15 @@ CREATE TABLE IF NOT EXISTS phases (
   kind TEXT, -- discovery | solution | backend | frontend | other
   sort_order INTEGER NOT NULL DEFAULT 0,
   effort_days REAL NOT NULL CHECK (effort_days >= 0),
-  parallel_ok INTEGER NOT NULL DEFAULT 0 CHECK (parallel_ok IN (0, 1))
+  start_sprint_id TEXT REFERENCES sprints(id)
+);
+
+CREATE TABLE IF NOT EXISTS phase_dependencies (
+  predecessor_phase_id TEXT NOT NULL REFERENCES phases(id) ON DELETE CASCADE,
+  successor_phase_id TEXT NOT NULL REFERENCES phases(id) ON DELETE CASCADE,
+  dependency_type TEXT NOT NULL CHECK (dependency_type IN ('finish_to_start', 'start_together')),
+  CHECK (predecessor_phase_id <> successor_phase_id),
+  PRIMARY KEY (predecessor_phase_id, successor_phase_id, dependency_type)
 );
 
 CREATE TABLE IF NOT EXISTS assignments (

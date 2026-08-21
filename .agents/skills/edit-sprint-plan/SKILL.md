@@ -1,134 +1,78 @@
 ---
 name: edit-sprint-plan
-description: Edits the sprint planner SQLite source of truth (data/planner.sqlite) with INSERT, UPDATE, and DELETE. Use when the user asks to change the plan, move someone onto a project, add or remove time off, split a phase, change priority, assign people, add a project or engineer, or otherwise update SQLite.
+description: Modify the sprint planner's live SQLite plan intent when a user asks to change people, projects, phases, dependencies, assignments, allocations, effort, priority, tags, sprints, planned starts, or time off. Use for plan-data mutations, not for application code/schema development, read-only schedule explanations, or saved-view UI configuration.
 ---
 
 # Edit the sprint plan
 
-The Next.js app is a **view**. Change the plan by writing rows in `data/planner.sqlite` (or `$PLANNER_DB`). The board at `/cursor` and `/codex` recomputes the timeline and flashes **Plan updated**.
+Translate the user's planning request into the smallest correct mutation of `data/planner.sqlite` (or `$PLANNER_DB`). The database stores intent; the scheduler calculates timeline bars from dependencies, capacity, time off, allocation fractions, and project priority.
 
-Do **not** insert Gantt cells. The scheduler fills sprints from today forward.
+Do not write Gantt cells or manually place calculated work.
 
-## Workflow
+## Route the request
 
-1. **Look up ids** in SQLite (or copy slugs from the inspector: `eng_maya`, `phase_checkout_be`, `proj_checkout`, `2026-S17`).
-2. **Write** `INSERT` / `UPDATE` / `DELETE` against the live DB. Enable foreign keys.
-3. **Check schedule impact** with `npm run plan:impact`. Review every new or changed overage with the user; adjust assignments or explicitly flag the impact before handoff.
-4. **Verify** the written rows with a `SELECT`. Do not run `npm run db:init` unless the user wants a full seed reset (destructive).
-5. If they want the change to survive `db:init`, also update [`data/seed.sql`](../../../data/seed.sql). Default is live DB only.
+| User intent | Source of truth | Important behavior |
+| --- | --- | --- |
+| Add, rename, tag, or change availability for a person | `engineers` | `fte` scales sprint capacity. Preserve stable `eng_*` IDs when only the display name changes. |
+| Add, rename, tag, recolor, reprioritize, or remove a project | `projects` | Lower `priority` claims contended capacity first. Project deletion cascades through its phases. |
+| Add, rename, resize, categorize, reorder, schedule, or remove a phase | `phases` | `effort_days` is person-days. `sort_order` is display/tie-break order only. `start_sprint_id` is a lower bound, not a fixed bar position. |
+| Make work sequential, start together, branch, or join | `phase_dependencies` | Use explicit `finish_to_start` and `start_together` relationships. Never infer scheduling dependencies from row order. |
+| Assign, reassign, split, add, or remove people from a phase | `assignments` | `fraction` is 0–1 of that person's available capacity while eligible. Multiple people shorten a phase by delivering effort together. |
+| Add, change, or remove leave | `time_off` | Leave reduces capacity for one sprint. `placement` is `start` or `end`. |
+| Add or change a sprint | `sprints` | Dates determine ordering; `working_days` determines capacity. |
+| Change a saved/default board view | Application view manager / `saved_views` | This is configuration, not plan intent. Do not hand-edit view JSON unless the user explicitly asks for a database-level repair. |
+| Change how the planner behaves or add a new data capability | Application code and schema | This is development work, not an ordinary plan edit. Do not mutate the live plan merely to simulate the feature. |
+
+For exact columns and constraints, read [`data/schema.sql`](../../../data/schema.sql). For mutation recipes, read [references/operations.md](references/operations.md). For dependency requests, also read [`docs/phase-dependencies.md`](../../../docs/phase-dependencies.md). For scheduling consequences, read [`docs/scheduling-and-queuing.md`](../../../docs/scheduling-and-queuing.md).
+
+## Required workflow
+
+1. **Resolve scope and IDs.** Query the relevant people, projects, phases, assignments, dependencies, sprints, and time off. Use stable slugs copied from the inspector when provided. Ask only when different interpretations would materially change ownership, dependency structure, timing, or destructive scope.
+2. **Inspect the baseline.** Run `npm run plan:impact`. Run the capacity report for every directly or transitively affected engineer. A dependency, priority, phase-size, sprint, or project change can affect downstream people who were not named by the user.
+3. **Model intent, not desired bars.** Choose assignments, fractions, dependencies, effort, priority, time off, and optional planned-start lower bounds that express the request. Do not reverse-engineer fixed sprint cells.
+4. **Write transactionally.** Enable foreign keys. Use a transaction for multi-row changes, reassignment, dependency replacement, renames that change IDs, or any destructive edit.
+5. **Verify the write.** Select the exact affected rows and run `PRAGMA foreign_key_check`. Confirm dependency direction and all assignment fractions.
+6. **Recalculate impact.** Run `npm run plan:impact` again and repeat capacity reports for affected engineers. Compare start/finish changes, overloads, idle time, time off, queued work, and unscheduled phases with the baseline.
+7. **Snapshot successful live edits.** Run `npm run plan:snapshot`. The snapshot is the durable, reviewable representation of the internal live plan.
+8. **Report the outcome.** State what changed, the calculated schedule effect, any new or changed overage/idle consequence, and any remaining ambiguity. If a destructive write occurred, state what was removed and how it can be recovered.
+
+Use the capacity helper for one person or the full roster:
 
 ```bash
-DB="${PLANNER_DB:-data/planner.sqlite}"
-sqlite3 -header -column "$DB" "PRAGMA foreign_keys = ON; SELECT id, name, title, fte FROM engineers ORDER BY sort_order;"
+npx tsx .agents/skills/edit-sprint-plan/scripts/plan-capacity.ts eng_maya
+npx tsx .agents/skills/edit-sprint-plan/scripts/plan-capacity.ts --all
 ```
 
-Apply changes with a heredoc:
+## Scheduling rules that change decisions
 
-```bash
-DB="${PLANNER_DB:-data/planner.sqlite}"
-sqlite3 "$DB" <<'SQL'
-PRAGMA foreign_keys = ON;
--- statements
-SQL
-```
+- **Effort:** `effort_days` is total person-days. One person-week is 5 days.
+- **Capacity:** default sprint capacity is `fte × working_days`, reduced by time off.
+- **Allocation:** `fraction` requests a share of a person's available capacity; it is not a fixed number of days.
+- **Priority:** lower project priority numbers win when eligible work competes for the same person.
+- **Finish to start:** a successor becomes eligible in the sprint after every predecessor finishes.
+- **Start together:** every active member must receive positive work in the same first sprint. Members then finish independently, and downstream phases may depend on either branch.
+- **Planned start:** `start_sprint_id` delays eligibility but cannot override unfinished dependencies or unavailable capacity.
+- **Unrelated phases:** phases without a dependency may overlap or start independently.
+- **Display order:** `sort_order` changes presentation and same-priority tie-breaking; it does not create a dependency.
 
-Inspect the computed timeline after every plan write:
+## Safety and persistence
 
-```bash
-npm run plan:impact
-```
+- Treat project, phase, engineer, sprint, and dependency deletion as potentially cascading. Inspect child rows and exact counts before deleting; obtain clarification when the user's request does not clearly authorize the cascade.
+- Never run `npm run db:init` for an ordinary edit. It destroys the live database and replaces it with demo seed data.
+- Do not update `data/seed.sql` for a live company-plan edit unless the user explicitly asks to change the demo/reset plan.
+- Do not change `data/schema.sql` unless the user explicitly requests a new application capability or schema migration.
+- Do not commit, push, publish, or sync merely because the live plan was edited. Those actions require a separate explicit request and the publishing skill.
+- Keep `planner.sqlite`, WAL, and SHM files untracked. After successful live edits, refresh `data/planner.snapshot.sql` with `npm run plan:snapshot`.
+- Never push internal plan data to the public GitHub remote. Internal/public publishing is governed by the repository's publishing skill.
 
-It reports the engineer, sprint, requested versus allocated capacity, and each active request contributing to an overage. This uses the same scheduler as the board; a SQL `SELECT` alone cannot reveal timeline conflicts.
+## Completion checks
 
-Schema: [`data/schema.sql`](../../../data/schema.sql). Extra worked examples: [`AGENT.md`](../../../AGENT.md).
+Before handing off, confirm:
 
-## Units
-
-- `effort_days` is person-days. **1 person-week = 5 days**.
-- A default sprint is **10 working days**. FTE `1.0` = 10 person-days per sprint.
-- `fraction` is 0–1 of that engineer’s capacity while the phase is eligible.
-- Project `priority`: **1 wins** when two eligible phases want the same person.
-
-## Tables
-
-| Table | Write this |
-| --- | --- |
-| `engineers` | People. `id` slug (`eng_maya`). `title` is Engineer, BA, … |
-| `sprints` | Named 2-week buckets. Dates `YYYY-MM-DD`. |
-| `projects` | Initiatives. `code` is the short bar label (`Chk`, or an emoji). Lower `priority` claims capacity first. |
-| `phases` | Ordered work on a project. `parallel_ok=1` may overlap the previous phase. |
-| `assignments` | Who works a phase, at what fraction. Not a cell per sprint. |
-| `time_off` | Days out in a given sprint. Shrinks that person’s capacity. |
-
-## Lookup queries
-
-```sql
-SELECT id, name, title, fte FROM engineers ORDER BY sort_order;
-SELECT id, name, start_date, end_date FROM sprints ORDER BY start_date;
-SELECT id, name, code, priority FROM projects ORDER BY sort_order;
-SELECT id, project_id, name, kind, effort_days, parallel_ok FROM phases ORDER BY project_id, sort_order;
-SELECT phase_id, engineer_id, fraction FROM assignments;
-SELECT engineer_id, sprint_id, days_off FROM time_off;
-```
-
-## Common edits
-
-### Assign or reassign someone
-
-```sql
-INSERT INTO assignments (phase_id, engineer_id, fraction)
-VALUES ('phase_payments_disc', 'eng_priya', 1.0)
-ON CONFLICT (phase_id, engineer_id) DO UPDATE SET fraction = excluded.fraction;
-
-DELETE FROM assignments
-WHERE phase_id = 'phase_payments_disc' AND engineer_id = 'eng_maya';
-```
-
-### Split a phase across two people (shortens it)
-
-Backend is 30 person-days. Maya alone at 100% is 3 sprints. Add Julian at 50%:
-
-```sql
-INSERT INTO assignments (phase_id, engineer_id, fraction)
-VALUES ('phase_checkout_be', 'eng_julian', 0.5)
-ON CONFLICT (phase_id, engineer_id) DO UPDATE SET fraction = excluded.fraction;
-```
-
-### Add a project and first phase
-
-```sql
-INSERT INTO projects (id, name, code, priority, sort_order)
-VALUES ('proj_payments', 'Payments', 'Pay', 2, 2);
-
-INSERT INTO phases (id, project_id, name, kind, sort_order, effort_days, parallel_ok)
-VALUES ('phase_payments_disc', 'proj_payments', 'Discovery', 'discovery', 1, 10, 0);
-
-INSERT INTO assignments (phase_id, engineer_id, fraction)
-VALUES ('phase_payments_disc', 'eng_maya', 0.5);
-```
-
-Lower-priority work waits if the person is already claimed by priority 1.
-
-### Time off
-
-```sql
-INSERT INTO time_off (engineer_id, sprint_id, days_off)
-VALUES ('eng_julian', '2026-S19', 2)
-ON CONFLICT (engineer_id, sprint_id) DO UPDATE SET days_off = excluded.days_off;
-```
-
-### Change size, priority, or overlap
-
-```sql
-UPDATE phases SET effort_days = 20 WHERE id = 'phase_checkout_be';
-UPDATE projects SET priority = 1 WHERE id = 'proj_atlas';
-UPDATE phases SET parallel_ok = 1 WHERE id = 'phase_checkout_fe';
-```
-
-New ids: `eng_*`, `proj_*`, `phase_*`, sprint ids like `2026-S17`. Keep them stable slugs, not display names.
-
-## Do not
-
-- Insert computed timeline / Gantt rows (there is no such table).
-- Change [`data/schema.sql`](../../../data/schema.sql) unless the user asked for a schema change.
-- Use the Team page roster helpers (`addEngineer` / `renameEngineer`) for plan edits; those are UI-only. Plan changes go through `sqlite3`.
+- the requested intent is present in SQLite;
+- `PRAGMA foreign_key_check` returns no rows;
+- the scheduler completes successfully;
+- affected capacity was reviewed before and after;
+- new or changed overloads are resolved or explicitly reported;
+- avoidable idle time introduced by the edit was considered;
+- `data/planner.snapshot.sql` reflects the successful live edit.

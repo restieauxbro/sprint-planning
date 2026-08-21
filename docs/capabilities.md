@@ -10,7 +10,7 @@ The planner records:
 - ordered project phases, their effort in person-days, and dependencies;
 - phase assignments, expressed as a share of each person's capacity.
 
-It can model shared work, part-time allocations, sequential or parallel phases, planned future starts, competing priorities, and unassigned work.
+It can model shared work, part-time allocations, explicit sequential gates, atomic start-together groups, independent branches, planned future starts, competing priorities, and unassigned work.
 
 ## Capacity-aware scheduling
 
@@ -22,7 +22,7 @@ The planner calculates a delivery schedule from the current sprint onward. It ta
 | --- | --- |
 | Team | Who is working on what in each sprint, including requested load, allocated load, idle time, and queued work. |
 | Projects | When each phase is expected to start and finish after capacity, priorities, and dependencies have been applied. |
-| Inspector | The selected phase's size, assignments, calculated schedule, and reason for its start. |
+| Inspector | The selected phase's size, assignments, calculated schedule, start group, dependent phases, and reason for its start. |
 
 The effort displayed for a phase is its requested size. Timeline bars in the Projects view represent the calculated, capacity-aware delivery timeline.
 
@@ -35,3 +35,5 @@ The effort displayed for a phase is its requested size. Timeline bars in the Pro
 - **Delayed** means an assigned phase began later than its dependency or planned start would otherwise allow.
 
 See [Scheduling and queuing](scheduling-and-queuing.md) for how these states affect delivery dates.
+
+See [Phase dependencies](phase-dependencies.md) for sequential, concurrent, and branching phase relationships.
